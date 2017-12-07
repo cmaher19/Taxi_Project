@@ -88,6 +88,7 @@ yellowjan2017 <- yellowjan2017 %>%
   filter(dropoff_borough != 'Unknown') %>%
   filter(pickup_borough != 'EWR') %>%
   filter(dropoff_borough != 'EWR') %>%
+  filter(pickup_servicezone != 'Airports') %>%
   filter(RatecodeID == 1)
 
 #Change to character because it allows app part to display neighborhood and borough names instead
@@ -113,6 +114,11 @@ yellowjan2017 %>%
 mod1 <- lm(total_amount ~ trip_distance, data=yellowjan2017)
 summary(mod1)
 
+newmod1 <- lm(total_amount ~ pickup_zone + dropoff_zone + pickup_hour
+              + weekday + trip_distance, data=yellowjan2017)
+summary(newmod1)
+
+
 #Visualize relationship between trip distance and pickup_zone
 #Do that here but also figure out what to do since pickup_zone has hundreds of factors
 
@@ -122,8 +128,10 @@ far_trips <- yellowjan2017 %>%
   filter(trip_distance > 18)
 
 #MODEL: Using pickup and dropoff zone to predict trip distance
-distance <- lm(trip_distance ~ pickup_zone + dropoff_zone, data=yellowjan2017)
+distance <- lm(trip_distance ~ pickup_zone + dropoff_zone + pickup_hour, data=yellowjan2017)
 summary(distance)
+
+yellowjan2017$distance_prediction <- predict(distance, yellowjan2017)
 #plot(distance)
 
 #predict on training set
@@ -195,7 +203,8 @@ ui <- shinyUI(fluidPage(
       h4(''),
       plotOutput("plot4"),
       h5(''),
-      plotOutput("plot5")
+      plotOutput("plot5"),
+      textOutput("distance")
     )    
   )
 )
@@ -247,9 +256,11 @@ server <- function(input, output) {
   
   observeEvent(
     input$submit, {
-      df.taxi <- data.frame(pickup_borough=input$pickup_borough, pickup_zone=input$pickup_zone, weekday=input$weekday, 
-                            dropoff_borough=input$dropoff_borough, dropoff_zone=input$dropoff_zone, pickup_day=input$pickup_day,
-                            pickup_hour=as.factor(input$pickup_hour), pickup_minute=as.factor(input$pickup_minute))
+      df.taxi <- data.frame(pickup_borough=input$pickup_borough, pickup_zone=input$pickup_zone, 
+                            weekday=input$weekday, dropoff_borough=input$dropoff_borough, 
+                            dropoff_zone=input$dropoff_zone, pickup_day=input$pickup_day,
+                            pickup_hour=as.factor(input$pickup_hour), 
+                            pickup_minute=as.factor(input$pickup_minute))
       df.taxi$trip_distance <- predict(distance, df.taxi)
       df.taxi$fare_prediction <- predict(mod1, df.taxi)
       output$prediction1 <- renderText(paste("The exact fare prediction is $", 
@@ -320,6 +331,7 @@ server <- function(input, output) {
                                          legend.background = element_rect(fill='gray90', size=1))
                                  
       )
+      output$distance <- renderText(df.taxi$trip_distance)
     })
   
 }
