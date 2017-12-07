@@ -203,8 +203,7 @@ ui <- shinyUI(fluidPage(
       h4(''),
       plotOutput("plot4"),
       h5(''),
-      plotOutput("plot5"),
-      textOutput("distance")
+      plotOutput("plot5")
     )    
   )
 )
@@ -331,7 +330,6 @@ server <- function(input, output) {
                                          legend.background = element_rect(fill='gray90', size=1))
                                  
       )
-      output$distance <- renderText(df.taxi$trip_distance)
     })
   
 }
