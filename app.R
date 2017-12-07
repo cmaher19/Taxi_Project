@@ -187,6 +187,7 @@ ui <- shinyUI(fluidPage(
       textOutput("prediction1"),
       textOutput("prediction2"),
       textOutput("prediction3"),
+      textOutput("prediction4"),
       h2(''),
       plotOutput("plot2"),
       h3(''),
@@ -251,15 +252,21 @@ server <- function(input, output) {
                             pickup_hour=as.factor(input$pickup_hour), pickup_minute=as.factor(input$pickup_minute))
       df.taxi$trip_distance <- predict(distance, df.taxi)
       df.taxi$fare_prediction <- predict(mod1, df.taxi)
-      output$prediction1 <- renderText(paste("The exact fare prediction in dollars: $", format(round(df.taxi$fare_prediction, 2), nsmaall=2)))
+      output$prediction1 <- renderText(paste("The exact fare prediction is $", 
+                                             format(round(df.taxi$fare_prediction, 2), nsmall=2), "."))
       df.taxi$lower_interval <- predict(mod1, df.taxi, interval="predict")[2]
       df.taxi$upper_interval <- predict(mod1, df.taxi, interval="predict")[3]
       output$prediction2 <- renderText(paste("95% of predicted fares for this time will fall between $", 
-                                             format(round(df.taxi$lower_interval,2), nsmall=2), "and $", format(round(df.taxi$upper_interval,2), nsmall=2)))
-      
-      #FIGURE OUT WHY THIS ISN'T WORKING
-      df.taxi$time_prediction <- predict(mod2, df.taxi)
-      output$prediction3 <- renderText("Time duration prediction in minutes:", df.taxi$time_prediction)
+                                             format(round(df.taxi$lower_interval,2), nsmall=2), "and $", 
+                                             format(round(df.taxi$upper_interval,2), nsmall=2), "."))
+      df.taxi$time_prediction <- ceiling(predict(mod2, df.taxi))
+      output$prediction3 <- renderText(paste("The predicted trip duration is", 
+                                             format(round(df.taxi$time_prediction, 2), nsmall=2), " minutes."))
+      df.taxi$lower_interval2 <- predict(mod2, df.taxi, interval="predict")[2]
+      df.taxi$upper_interval2 <- predict(mod2, df.taxi, interval="predict")[3]
+      output$prediction4 <- renderText(paste("We are 95% confident that your trip will last between", 
+                                             format(round(df.taxi$lower_interval2,2), nsmall=2), "and", 
+                                             format(round(df.taxi$upper_interval2,2), nsmall=2), "minutes."))
       
       
       pickup <- levels(df.taxi$pickup_hour)
