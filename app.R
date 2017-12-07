@@ -14,7 +14,7 @@ library(tidyverse)
 
 
 #Load the data
-yellowjan2017 <- read.csv('yellowjan2016_sample.csv')
+yellowjan2017 <- read.csv('yellowjan2017_sample.csv')
 taxi_zone <- read.csv('taxi_zone_lookup.csv')
 
 #DATA WRANGLING
