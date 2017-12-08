@@ -14,36 +14,37 @@ library(tidyverse)
 
 
 #Load the data
-yellowjan2017 <- read.csv('yellowjan2017_sample.csv')
+jan2016 <- read.csv('yellowjan2016_sample.csv')
+
 taxi_zone <- read.csv('taxi_zone_lookup.csv')
 
 #DATA WRANGLING
 
 #Convert pickup and dropoff date and time information into date-time objects
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   mutate(tpep_pickup_datetime = as.POSIXct(tpep_pickup_datetime),
          tpep_dropoff_datetime = as.POSIXct(tpep_dropoff_datetime))
 
 
 #Create a total trip duration variable (in minutes)
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   mutate(trip_duration = difftime(tpep_dropoff_datetime, tpep_pickup_datetime, unit='min'))
 
 
 #Split date and time pick up and drop off variables into two separate variables each 
 #(one for date and one for time)
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   separate(tpep_pickup_datetime, into=c('pickup_date', 'pickup_time'), sep=10) %>%
   separate(tpep_dropoff_datetime, into=c('dropoff_date', 'dropoff_time'), sep=10)
 
 
 #Remove the extra space in front of time variables
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   mutate(pickup_time = trimws(pickup_time, which='left'),
          dropoff_time = trimws(dropoff_time, which='left'))
 
 #Separate the time variables into hours and minutes and seconds, then factor them
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   separate(pickup_time, into = c('pickup_hour', 'pickup_minute', 'pickup_seconds'), sep=':') %>%
   separate(dropoff_time, into = c('dropoff_hour', 'dropoff_minute', 'dropoff_seconds'), sep=':') %>%
   mutate(pickup_hour = as.factor(pickup_hour), pickup_minute = as.factor(pickup_minute),
@@ -51,39 +52,39 @@ yellowjan2017 <- yellowjan2017 %>%
 
 
 #Convert pickup and dropoff dates to actual date variables
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   mutate(pickup_date = as.Date(pickup_date), dropoff_date = as.Date(dropoff_date))
 
 
 #Extract weekday from dates so that it can be used in later models/predictions
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   mutate(weekday = weekdays(pickup_date))
 
 
 # Separate date variables into year, month, and day separately so that they are easier to 
 # match with user input
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   separate(pickup_date, into=c('pickup_year', 'pickup_month', 'pickup_day'), sep='-') %>%
   separate(dropoff_date, into=c('dropoff_year', 'dropoff_month', 'dropoff_day'), sep='-')
 
 
 #Convert month and day to factors for later use in predictive models
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   mutate(pickup_month = as.factor(pickup_month), pickup_day = as.factor(pickup_day),
          dropoff_month = as.factor(dropoff_month), dropoff_day = as.factor(dropoff_day))
 
 
 #join taxi zone data onto yellow cab data for both pickup and dropoff location
-yellowjan2017 <- left_join(yellowjan2017, taxi_zone, by=c('PULocationID'='LocationID')) %>%
+jan2016 <- left_join(jan2016, taxi_zone, by=c('PULocationID'='LocationID')) %>%
   rename(pickup_borough = Borough, pickup_zone=Zone, pickup_servicezone=service_zone)
 
-yellowjan2017 <- left_join(yellowjan2017, taxi_zone, by=c('DOLocationID'='LocationID')) %>%
+jan2016 <- left_join(jan2016, taxi_zone, by=c('DOLocationID'='LocationID')) %>%
   rename(dropoff_borough = Borough, dropoff_zone=Zone, dropoff_servicezone=service_zone)
 
 
 #Filter out observations with no pickup/dropoff location, rides that go to Newark Airport, and rates other 
 #then the standard fare rates (there were some shady exchanges in the nonstandard fare options)
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   filter(pickup_borough != 'Unknown') %>%
   filter(dropoff_borough != 'Unknown') %>%
   filter(pickup_borough != 'EWR') %>%
@@ -93,7 +94,7 @@ yellowjan2017 <- yellowjan2017 %>%
 
 #Change to character because it allows app part to display neighborhood and borough names instead
 #of just a number
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   mutate(pickup_borough = as.character(pickup_borough), pickup_zone = as.character(pickup_zone),
          dropoff_borough = as.character(dropoff_borough), dropoff_zone = as.character(dropoff_zone))
 
@@ -106,16 +107,16 @@ yellowjan2017 <- yellowjan2017 %>%
 #First build model to predict trip_distance, then use that prediction in this model
 
 #Visualize relationship between trip distance and total fare --> pretty strong upward linear trend
-yellowjan2017 %>%
+jan2016 %>%
   ggplot(aes(x=trip_distance, y=total_amount, col=pickup_borough)) + geom_point(alpha=0.2) + 
   facet_grid(pickup_borough~.)
 
 #MODEL: Using trip distance to predict total fare amount, adj R^2 is 0.8954 (yay!)
-mod1 <- lm(total_amount ~ trip_distance, data=yellowjan2017)
+mod1 <- lm(total_amount ~ trip_distance, data=jan2016)
 summary(mod1)
 
 newmod1 <- lm(total_amount ~ pickup_zone + dropoff_zone + pickup_hour
-              + weekday + trip_distance, data=yellowjan2017)
+              + weekday + trip_distance, data=jan2016)
 summary(newmod1)
 
 
@@ -124,50 +125,50 @@ summary(newmod1)
 
 #Should we filter out the super far trips? May lose some information about some boroughs to far away boroughs
 #But it would probably make the distribution a lot more normal
-far_trips <- yellowjan2017 %>%
+far_trips <- jan2016 %>%
   filter(trip_distance > 18)
 
 #MODEL: Using pickup and dropoff zone to predict trip distance
-distance <- lm(trip_distance ~ pickup_zone + dropoff_zone + pickup_hour, data=yellowjan2017)
+distance <- lm(trip_distance ~ pickup_zone + dropoff_zone + pickup_hour, data=jan2016)
 summary(distance)
 
-yellowjan2017$distance_prediction <- predict(distance, yellowjan2017)
+jan2016$distance_prediction <- predict(distance, jan2016)
 #plot(distance)
 
 #predict on training set
-yellowjan2017$total_prediction <- predict(mod1, yellowjan2017)
-test_result <- yellowjan2017 %>%
+jan2016$total_prediction <- predict(mod1, jan2016)
+test_result <- jan2016 %>%
   summarise(MAE = sum(abs(total_prediction - total_amount))/n(),
             MSE = sum((total_prediction - total_amount)/n()),
             SSE = sum((total_prediction - total_amount)^2))
 test_result
 
-yellowjan2017$factor_pickup = factor(x = yellowjan2017$pickup_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
-yellowjan2017$factor_dropoff = factor(x = yellowjan2017$dropoff_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
-yellowjan2017$trip_duration = as.numeric(yellowjan2017$trip_duration)
+jan2016$factor_pickup = factor(x = jan2016$pickup_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
+jan2016$factor_dropoff = factor(x = jan2016$dropoff_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
+jan2016$trip_duration = as.numeric(jan2016$trip_duration)
 
 #density of trip_duration
-duration_density <- yellowjan2017 %>%
+duration_density <- jan2016 %>%
   filter(trip_duration < 60) %>% #made decision to do less than 60 because it skews heavily right with 
   #very low density after that cut off
   ggplot(aes(x=trip_duration)) + geom_density()
 
-yellowjan2017 <- yellowjan2017 %>%
+jan2016 <- jan2016 %>%
   filter(trip_duration < 60)
 
 #trying to build useful trip duration model
-yellowjan2017 %>%
+jan2016 %>%
   ggplot(aes(x=pickup_borough, y=trip_duration)) + geom_boxplot()
 
-yellowjan2017 %>%
+jan2016 %>%
   ggplot(aes(x=dropoff_borough, y=trip_duration)) + geom_boxplot()
 
-yellowjan2017 %>%
+jan2016 %>%
   group_by(dropoff_borough) %>%
   ggplot(aes(x=dropoff_borough, y=trip_duration)) + geom_boxplot()
 
 #final model for predicting trip duration (in minutes)
-mod2 <- lm(trip_duration ~ pickup_zone + dropoff_zone + pickup_hour + trip_distance, data=yellowjan2017)
+mod2 <- lm(trip_duration ~ pickup_zone + dropoff_zone + pickup_hour + trip_distance, data=jan2016)
 summary(mod2)
 
 # Define UI for application
@@ -176,14 +177,14 @@ ui <- shinyUI(fluidPage(
   sidebarLayout(
     sidebarPanel(
       tags$style(".content, .container-fluid {background-color: #8897a6;}"),
-      selectInput('pickup_month', 'Select Month', choices=as.character(unique(sort(yellowjan2017$pickup_month)))),
-      selectInput('pickup_day', 'Select Date', choices=as.character(unique(sort(yellowjan2017$pickup_day)))),
+      selectInput('pickup_month', 'Select Month', choices=as.character(unique(sort(jan2016$pickup_month)))),
+      selectInput('pickup_day', 'Select Date', choices=as.character(unique(sort(jan2016$pickup_day)))),
       selectInput('weekday', 'Select Day of Week', choices=as.character(unique(c('Sunday', 'Monday', 
                                                                                  'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')))),
       selectInput('pickup_hour', 'Select Hour of Pickup', 
-                  choices=unique(sort(yellowjan2017$pickup_hour))), 
+                  choices=unique(sort(jan2016$pickup_hour))), 
       selectInput('pickup_minute', 'Select Minute of Pickup', 
-                  choices=as.character(unique(sort(yellowjan2017$pickup_minute)))),
+                  choices=as.character(unique(sort(jan2016$pickup_minute)))),
       uiOutput('PBorough'),
       uiOutput('PNeighborhood'),
       uiOutput('DBorough'),
@@ -212,31 +213,31 @@ ui <- shinyUI(fluidPage(
 # Define server
 server <- function(input, output) {
   output$PBorough <- renderUI(selectInput('pickup_borough',
-                                          'Select Pickup Borough', c(unique(sort(yellowjan2017$pickup_borough))))
+                                          'Select Pickup Borough', c(unique(sort(jan2016$pickup_borough))))
   )
   output$PNeighborhood <- renderUI(
     if(is.null(input$pickup_borough)) {return()}
     else selectInput('pickup_zone', 'Select Pickup Neighborhood',
-                     c(unique(sort(yellowjan2017$pickup_zone[which(yellowjan2017$pickup_borough == input$pickup_borough)])))
+                     c(unique(sort(jan2016$pickup_zone[which(jan2016$pickup_borough == input$pickup_borough)])))
     ))
   
   output$DBorough <- renderUI(selectInput('dropoff_borough',
-                                          'Select Dropoff Borough', c(unique(sort(yellowjan2017$dropoff_borough)))
+                                          'Select Dropoff Borough', c(unique(sort(jan2016$dropoff_borough)))
   ))
   output$DNeighborhood <- renderUI(
     if(is.null(input$dropoff_borough)) {return()}
     else selectInput('dropoff_zone', 'Select Dropoff Neighborhood',
-                     c(unique(sort(yellowjan2017$dropoff_zone[which(yellowjan2017$dropoff_borough == input$dropoff_borough)])))
+                     c(unique(sort(jan2016$dropoff_zone[which(jan2016$dropoff_borough == input$dropoff_borough)])))
     ))
   
   sub1 <- reactive(
-    yellowjan2017[which(yellowjan2017$pickup_borough==input$borough),]
+    jan2016[which(jan2016$pickup_borough==input$borough),]
   )
   sub2 <- reactive(
     sub1()[which(sub1()$pickup_zone == input$neighborhood),]
   )
   sub3 <- reactive(
-    yellowjan2017[which(yellowjan2017$dropoff_borough==input$dborough),]
+    jan2016[which(jan2016$dropoff_borough==input$dborough),]
   )
   sub4 <- reactive(
     sub3()[which(sub3()$dropoff_zone == input$dneighborhood),]
@@ -280,23 +281,23 @@ server <- function(input, output) {
       
       
       pickup <- levels(df.taxi$pickup_hour)
-      output$plot2 <- renderPlot(yellowjan2017 %>%
-                                   filter(yellowjan2017$pickup_hour == pickup) %>%
+      output$plot2 <- renderPlot(jan2016 %>%
+                                   filter(jan2016$pickup_hour == pickup) %>%
                                    ggplot(aes(x=total_amount)) + geom_density()
                                  + annotate("segment", x=df.taxi$fare_prediction, xend=df.taxi$fare_prediction,
                                             y=0, yend=0.1, color="Purple")
                                  + ggtitle("Distribution of Fares for Chosen Pickup Hour") 
                                  + xlab("Fare Price") + ylab("Density"))
       output$plot3 <- renderPlot(
-        yellowjan2017 %>%
-          filter(yellowjan2017$pickup_zone == input$pickup_zone) %>%
+        jan2016 %>%
+          filter(jan2016$pickup_zone == input$pickup_zone) %>%
           ggplot(aes(x=total_amount)) + geom_density() 
         + annotate("segment", x=df.taxi$fare_prediction, xend=df.taxi$fare_prediction,
                    y=0, yend=0.1, color="Purple") 
         + ggtitle("Distribution of Fares for Chosen Pickup Neighborhood") 
         + xlab("Fare Price") + ylab("Density"))
       
-      output$plot4 <- renderPlot(yellowjan2017 %>% 
+      output$plot4 <- renderPlot(jan2016 %>% 
                                    filter(pickup_hour==input$pickup_hour) %>%
                                    ggplot(aes(x=factor_pickup, y=factor_dropoff, fill=total_amount)) + geom_tile() + 
                                    labs(x = 'Pickup Borough', y = 'Dropoff Borough',
@@ -313,7 +314,7 @@ server <- function(input, output) {
                                          legend.background = element_rect(fill='gray90', size=1))
       )
       
-      output$plot5 <- renderPlot(yellowjan2017 %>%
+      output$plot5 <- renderPlot(jan2016 %>%
                                    filter(pickup_hour==input$pickup_hour) %>%
                                    ggplot(aes(x=factor_pickup, y=factor_dropoff, fill=trip_duration)) + geom_tile() + 
                                    labs(x = 'Pickup Borough', y = 'Dropoff Borough', 
