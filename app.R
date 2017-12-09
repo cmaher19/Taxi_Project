@@ -20,6 +20,9 @@ jan2016 <- read.csv('jan2016.csv')
 
 taxi_zone <- read.csv('taxi_zone_lookup.csv')
 
+#Map making
+ggplot() + geom_polygon(data=jan2016, aes(x=pickup_longitude, y=pickup_latitude)) + coord_fixed(1.3)
+
 #DATA WRANGLING
 
 #Convert pickup and dropoff date and time information into date-time objects
