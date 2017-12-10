@@ -13,6 +13,7 @@ library(shiny)
 library(tidyverse)
 library(maps)
 library(mapdata)
+library(leaflet)
 
 
 #Load the data
@@ -158,6 +159,16 @@ newmod1 <- lm(total_amount ~ pickup_zone + dropoff_zone + pickup_hour
 summary(newmod1)
 
 
+#MAPS
+map <- leaflet()
+map <- addTiles(map)
+map <- addMarkers(map, lng=-73.8648, lat=40.8448, popup="Bronx")
+map <- addMarkers(map, lng=-73.9442, lat=40.6782, popup="Brooklyn")
+map <- addMarkers(map, lng=-73.9712, lat=40.7831, popup="Manhattan")
+map <- addMarkers(map, lng=-73.7949, lat=40.7282, popup="Queens")
+map
+
+
 #Visualize relationship between trip distance and pickup_zone
 #Do that here but also figure out what to do since pickup_zone has hundreds of factors
 
@@ -242,7 +253,9 @@ ui <- shinyUI(fluidPage(
       h4(''),
       plotOutput("plot4"),
       h5(''),
-      plotOutput("plot5")
+      plotOutput("plot5"),
+      h6(''),
+      leafletOutput("Map1")
     )    
   )
 )
@@ -267,6 +280,22 @@ server <- function(input, output) {
     else selectInput('dropoff_zone', 'Select Dropoff Neighborhood',
                      c(unique(sort(jan2016$dropoff_zone[which(jan2016$dropoff_borough == input$dropoff_borough)])))
     ))
+  
+  output$Map1 <- renderLeaflet({
+  leaflet() %>% 
+  addProviderTiles("Stamen.Watercolor") %>% 
+  setView(lng = -100, lat = 50, zoom = 2)
+  })
+  
+  observe({
+  
+  
+  leafletProxy("Map1") %>% clearMarkers() %>% 
+  addCircleMarkers(lng = jan2016$pickup_longitude,
+  lat = jan2016$pickup_latitude,
+  opacity = 0.5)
+  })
+  
   
   sub1 <- reactive(
     jan2016[which(jan2016$pickup_borough==input$borough),]
