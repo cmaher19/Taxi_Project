@@ -17,11 +17,63 @@ library(mapdata)
 
 #Load the data
 jan2016 <- read.csv('jan2016.csv')
+centroids <- read.csv('NHoodNameCentroids.csv')
 
-taxi_zone <- read.csv('taxi_zone_lookup.csv')
+#clean centroid data
+centroids$longitude.latitude.section.borough <- as.character(centroids$longitude.latitude.section.borough)
 
-#Map making
-ggplot() + geom_polygon(data=jan2016, aes(x=pickup_longitude, y=pickup_latitude)) + coord_fixed(1.3)
+centroids <- centroids %>%
+  separate(longitude.latitude.section.borough, into=c('n_longitude', 'n_latitude', 'neighborhood', 'borough'), sep=';') %>%
+  mutate(n_longitude = as.numeric(n_longitude), n_latitude = as.numeric(n_latitude))
+
+#create a file with the taxi pickup and dropoff locations
+coordinates <- jan2016 %>%
+  select(pickup_longitude, pickup_latitude, dropoff_longitude, dropoff_latitude)
+write.csv(coordinates, 'cab_coordinates.csv')
+
+cab_coordinates <- read.csv('cab_coordinates.csv') %>%
+  select(-X)
+
+# Find nearest neighborhood for pickup based on coordinates
+n <- 1:nrow(cab_coordinates)
+m <- 1:nrow(centroids)
+
+pickup_distance <- function(m,n) {
+  sqrt((cab_coordinates$pickup_latitude[n] - centroids$n_latitude[m])^2 + (cab_coordinates$pickup_longitude[n] - centroids$n_longitude[m])^2)
+}
+
+distance <- lapply(m,n, FUN=pickup_distance)
+distance <- as.data.frame(distance)
+colnames(distance) = centroids[,3]
+pickup_nhood <- colnames(distance)[apply(distance, 1, which.min)]
+pickup_nhood <- as.data.frame(pickup_nhood)
+
+# Find nearest neighborhood for dropoff based on coordinates
+dropoff_distance <- function(m,n) {
+  sqrt((cab_coordinates$dropoff_latitude[n] - centroids$n_latitude[m])^2 + (cab_coordinates$dropoff_longitude[n] - centroids$n_longitude[m])^2)
+}
+
+distance1 <- lapply(m,n, FUN=dropoff_distance)
+distance1 <- as.data.frame(distance1)
+colnames(distance1) = centroids[,3]
+dropoff_nhood <- colnames(distance1)[apply(distance1, 1, which.min)]
+dropoff_nhood <- as.data.frame(dropoff_nhood)
+
+
+# Bind the two neighborhoods (pickup and dropoff) into one data frame
+neighborhoods <- cbind(pickup_nhood, dropoff_nhood)
+jan2016 <- cbind(jan2016, neighborhoods)
+
+#join neighborhood centroid data onto yellow cab data for both pickup and dropoff location
+jan2016 <- left_join(jan2016, centroids, by=c('pickup_nhood'='neighborhood')) %>%
+  rename(pickup_borough = borough, pickup_zone=pickup_nhood) %>%
+  select(-n_longitude, -n_latitude)
+
+
+jan2016 <- left_join(jan2016, centroids, by=c('dropoff_nhood'='neighborhood')) %>%
+  rename(dropoff_borough = borough, dropoff_zone=dropoff_nhood) %>%
+  select(-n_longitude, -n_latitude)
+
 
 #DATA WRANGLING
 
@@ -79,29 +131,10 @@ jan2016 <- jan2016 %>%
          dropoff_month = as.factor(dropoff_month), dropoff_day = as.factor(dropoff_day))
 
 
-#join taxi zone data onto yellow cab data for both pickup and dropoff location
-jan2016 <- left_join(jan2016, taxi_zone, by=c('PULocationID'='LocationID')) %>%
-  rename(pickup_borough = Borough, pickup_zone=Zone, pickup_servicezone=service_zone)
-
-jan2016 <- left_join(jan2016, taxi_zone, by=c('DOLocationID'='LocationID')) %>%
-  rename(dropoff_borough = Borough, dropoff_zone=Zone, dropoff_servicezone=service_zone)
-
-
-#Filter out observations with no pickup/dropoff location, rides that go to Newark Airport, and rates other 
-#then the standard fare rates (there were some shady exchanges in the nonstandard fare options)
+# Filter out observations with pickup/dropoff coordinates with zeroes and rates other 
+# than the standard fare rates (there were some shady exchanges in the nonstandard fare options)
 jan2016 <- jan2016 %>%
-  filter(pickup_borough != 'Unknown') %>%
-  filter(dropoff_borough != 'Unknown') %>%
-  filter(pickup_borough != 'EWR') %>%
-  filter(dropoff_borough != 'EWR') %>%
-  filter(pickup_servicezone != 'Airports') %>%
-  filter(RatecodeID == 1)
-
-#Change to character because it allows app part to display neighborhood and borough names instead
-#of just a number
-jan2016 <- jan2016 %>%
-  mutate(pickup_borough = as.character(pickup_borough), pickup_zone = as.character(pickup_zone),
-         dropoff_borough = as.character(dropoff_borough), dropoff_zone = as.character(dropoff_zone))
+  filter(RatecodeID == 1, pickup_longitude != 0)
 
 
 #MODEL BUILDING

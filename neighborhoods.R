@@ -25,22 +25,38 @@ coordinates <- jan2016 %>%
 write.csv(coordinates, 'cab_coordinates.csv')
   
 cab_coordinates <- read.csv('cab_coordinates.csv') %>%
-  select(-X) %>%
-  filter(pickup_longitude != 0)
+  select(-X)
 
 # Somehow join together the neighborhood data and the cab data?
 # I want to compare the pickup longitude and latitude with each centroid longitude and latitude via the distance formula and then take the minimum distance
 
 
-n <- 1:53525
-m <- 1:299
+n <- 1:nrow(cab_coordinates)
+m <- 1:nrow(centroids)
 
-test <- function(n,m) {
- (cab_coordinates$pickup_latitude[n] - centroids$n_latitude[m])^2 - (cab_coordinates$pickup_longitude[n] - centroids$n_longitude[m])^2
+pickup_distance <- function(m,n) {
+  sqrt((cab_coordinates$pickup_latitude[n] - centroids$n_latitude[m])^2 + (cab_coordinates$pickup_longitude[n] - centroids$n_longitude[m])^2)
 }
 
-square_distance <- lapply(n, m, FUN=test)
+distance <- lapply(m,n, FUN=pickup_distance)
+distance <- as.data.frame(distance)
+colnames(distance) = centroids[,3]
+pickup_nhood <- colnames(distance)[apply(distance, 1, which.min)]
+pickup_nhood <- as.data.frame(pickup_nhood)
+
+dropoff_distance <- function(m,n) {
+  sqrt((cab_coordinates$dropoff_latitude[n] - centroids$n_latitude[m])^2 + (cab_coordinates$dropoff_longitude[n] - centroids$n_longitude[m])^2)
+}
+
+distance1 <- lapply(m,n, FUN=dropoff_distance)
+distance1 <- as.data.frame(distance1)
+colnames(distance1) = centroids[,3]
+dropoff_nhood <- colnames(distance1)[apply(distance1, 1, which.min)]
+dropoff_nhood <- as.data.frame(dropoff_nhood)
 
 
+# Bind the two neighborhoods (pickup and dropoff) into one data frame
+neighborhoods <- cbind(pickup_nhood, dropoff_nhood)
+jan2016 <- cbind(jan2016, neighborhoods)
 
 
