@@ -22,9 +22,13 @@ library(rgdal)
 
 
 #Load the data
-jan2016 <- read.csv('jan2016.csv')
-feb2016 <- read.csv('feb2016.csv')
-cab2016 <- rbind(jan2016, feb2016)
+jan2016 <- read.csv('jan1.csv')
+feb2016 <- read.csv('feb1.csv')
+mar2016 <- read.csv('mar1.csv')
+apr2016 <- read.csv('apr1.csv')
+may2016 <- read.csv('may1.csv')
+jun2016 <- read.csv('jun1.csv')
+cab2016 <- rbind(jan2016, feb2016, mar2016, apr2016, may2016, jun2016)
 centroids <- read.csv('NHoodNameCentroids.csv')
 
 #clean centroid data
@@ -178,15 +182,15 @@ summary(newmod1)
 
 #MODEL: Using pickup and dropoff zone to predict trip distance
 distance_mod <- lm(trip_distance ~ pickup_zone + dropoff_zone + pickup_hour, data=cab2016)
-summary(distance)
+summary(distance_mod)
 
 cab2016$distance_prediction <- predict(distance_mod, cab2016)
 #plot(distance)
 
 
 
-cab2016$factor_pickup = factor(x = cab2016$pickup_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
-cab2016$factor_dropoff = factor(x = cab2016$dropoff_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
+#cab2016$factor_pickup = factor(x = cab2016$pickup_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
+#cab2016$factor_dropoff = factor(x = cab2016$dropoff_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
 cab2016$trip_duration = as.numeric(cab2016$trip_duration)
 
 #density of trip_duration
@@ -210,7 +214,7 @@ cab2016 %>%
   ggplot(aes(x=dropoff_borough, y=trip_duration)) + geom_boxplot()
 
 #final model for predicting trip duration (in minutes)
-mod2 <- lm(trip_duration ~ pickup_zone + dropoff_zone + pickup_hour + trip_distance, data=cab2016)
+mod2 <- lm(trip_duration ~ pickup_zone + dropoff_zone + pickup_hour + trip_distance + pickup_month, data=cab2016)
 summary(mod2)
 
 # Prepare shapefile for use
@@ -221,7 +225,7 @@ neighborhood_shape_df <- tidy(neighborhood_shape)
 
 # Define UI for application
 ui <- shinyUI(fluidPage(
-  titlePanel('Ca$h Cab'),
+  span(titlePanel('Ca$h Cab'), style="color:#F9D90A"),
   sidebarLayout(
     sidebarPanel(
       tags$style(".content, .container-fluid {background-color: #8897a6;}"),
@@ -240,18 +244,18 @@ ui <- shinyUI(fluidPage(
       actionButton("submit", "Submit")
     ),
     mainPanel(
-      span(h1('Fare Prediction'), style="color:azure"),
-      textOutput("instructions"),
-      h2(''),
-      leafletOutput("Map1"),
+      span(h2('NYC Cab Fares and Trip Duration'), style="color:#F9D90A"),
+      span(h3('A Predictive Model'), style="color:#F9D90A"),
+      h5(textOutput("instructions")),
       h3(''),
-      textOutput("prediction1"),
-      textOutput("prediction3"),
-      textOutput("prediction4"),
-      h4(''),
-      textOutput("explanation"),
+      leafletOutput("Map1"),
+      h5(textOutput("prediction1")),
+      h5(textOutput("prediction3")),
+      h5(textOutput("prediction4")),
       h5(''),
-      leafletOutput("Map3")
+      h5(textOutput("explanation")),
+      h6(''),
+      leafletOutput("Map2")
     )    
   )
 )
@@ -317,7 +321,7 @@ server <- function(input, output) {
                             weekday=input$weekday, dropoff_borough=input$dropoff_borough, 
                             dropoff_zone=input$dropoff_zone, pickup_day=input$pickup_day,
                             pickup_hour=as.factor(input$pickup_hour), 
-                            pickup_minute=as.factor(input$pickup_minute))
+                            pickup_minute=as.factor(input$pickup_minute), pickup_month=input$pickup_month)
       df.taxi$trip_distance <- predict(distance_mod, df.taxi)
       df.taxi$fare_prediction <- predict(newmod1, df.taxi)
       df.taxi$lower_interval <- predict(newmod1, df.taxi, interval="predict")[2]
@@ -328,9 +332,9 @@ server <- function(input, output) {
       df.taxi$time_prediction <- ceiling(predict(mod2, df.taxi))
       df.taxi$lower_interval2 <- predict(mod2, df.taxi, interval="predict")[2]
       df.taxi$upper_interval2 <- predict(mod2, df.taxi, interval="predict")[3]
-      output$prediction3 <- renderText(paste("The predicted trip duration is", 
-                                             format(round(df.taxi$time_prediction, 2), nsmall=2), " minutes but could
-                                             last as long as", format(round(df.taxi$upper_interval2,2), nsmall=2), "minutes."))
+      output$prediction3 <- renderText(paste("Your trip is expected to take about", 
+                                             format(round(df.taxi$time_prediction, 0), nsmall=0), " minutes but could
+                                             last as long as", format(round(df.taxi$upper_interval2,0), nsmall=0), "minutes."))
       mapdata <- cab2016 %>%
         filter(pickup_zone==input$pickup_zone, dropoff_zone==input$dropoff_zone, pickup_hour == input$pickup_hour)
       
@@ -338,7 +342,7 @@ server <- function(input, output) {
                                        The blue dots represent cabs picking up fares in the same neighborhood you
                                        designated for pickup. The red dots represent cabs dropping off in the same 
                                        neighborhood that you designated for drop off.")
-      output$Map3 <- renderLeaflet({
+      output$Map2 <- renderLeaflet({
         leaflet(neighborhood_shape) %>%
           addTiles() %>% 
           addProviderTiles("CartoDB.Positron") %>%
