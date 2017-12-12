@@ -19,7 +19,6 @@ library(maptools)
 library(broom)
 library(httr)
 library(rgdal)
-install.packages("googleway")
 library(googleway)
 
 #Load the data
@@ -158,7 +157,8 @@ cab2016 <- cab2016 %>%
 #Visualize relationship between trip distance and total fare --> pretty strong upward linear trend
 cab2016 %>%
   ggplot(aes(x=trip_distance, y=total_amount, col=pickup_borough)) + geom_point(alpha=0.2) + 
-  facet_grid(pickup_borough~.)
+  facet_grid(pickup_borough~.) + ggtitle('Relationship between Fare and Trip Distance') +
+  xlab('Trip Distance') + ylab('Total Amount ($)') + labs(color = 'Pickup Borough')
 
 #Should we filter out the super far trips? May lose some information about some boroughs to far away boroughs
 #But it would probably make the distribution a lot more normal
@@ -225,11 +225,6 @@ leaflet(neighborhood_shape) %>%
   addProviderTiles("CartoDB.Positron") %>%
   setView(-73.98, 40.75, zoom = 12)
 
-#%>%
-#add_markers(lat = neighborhood_shape_df$coords.x2, lon = neighborhood_shape_df$coords.x1) 
-#label = name, mouse_over=name) #%>%
-#setView(-73.98, 40.75, zoom = 12)
-
 #trying something crazy
 api_key <- "AIzaSyBMILnxtB-IgmBIjsaxYyZK_Y0LwoOvYIE"
 
@@ -246,8 +241,6 @@ ui <- shinyUI(fluidPage(
                                                                                  'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')))),
       selectInput('pickup_hour', 'Select Hour of Pickup', 
                   choices=unique(sort(cab2016$pickup_hour))), 
-      selectInput('pickup_minute', 'Select Minute of Pickup', 
-                  choices=as.character(unique(sort(cab2016$pickup_minute)))),
       uiOutput('PBorough'),
       uiOutput('PNeighborhood'),
       uiOutput('DBorough'),
@@ -259,14 +252,15 @@ ui <- shinyUI(fluidPage(
       span(h3('A Predictive Model'), style="color:#F9D90A"),
       h5(textOutput("instructions")),
       h3(''),
-      google_mapOutput("Map1"),
+      leafletOutput("Map1"),
       h5(textOutput("prediction1")),
       h5(textOutput("prediction3")),
       h5(textOutput("prediction4")),
       h5(''),
       h5(textOutput("explanation")),
-      h6(''),
+      h5(''),
       leafletOutput("Map2"),
+      h5(''),
       google_mapOutput("myMap")
     )    
   )
@@ -319,18 +313,17 @@ server <- function(input, output) {
   output$instructions <- renderText("As you are choosing your pickup and dropoff location, you can refer to the
                                     following map for reference. You can click on a marker and the name of that
                                     neighborhood will appear.")
-  #output$Map1 <- renderGoogle_map({
-   # google_map(key = api_key, data=neighborhood_shape_df) %>%
-     # add_markers(lat=neighborhood_shape_df$coords.x2, lon=neighborhood_shape_df$coords.x1)
- # })
-  
+  output$Map1 <- renderLeaflet(leaflet(data=neighborhood_shape_df) %>%
+                                 addTiles(urlTemplate = "http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}&s=Ga", 
+                                          attribution = 'Google') %>%
+                                 addMarkers(~coords.x1, ~coords.x2, popup=~name) %>%
+                                 setView(-73.98, 40.75, zoom = 12))
   observeEvent(
     input$submit, {
       df.taxi <- data.frame(pickup_borough=input$pickup_borough, pickup_zone=input$pickup_zone, 
                             weekday=input$weekday, dropoff_borough=input$dropoff_borough, 
                             dropoff_zone=input$dropoff_zone, pickup_day=input$pickup_day,
-                            pickup_hour=as.factor(input$pickup_hour), 
-                            pickup_minute=as.factor(input$pickup_minute), pickup_month=input$pickup_month)
+                            pickup_hour=as.factor(input$pickup_hour), pickup_month=input$pickup_month)
       df.taxi$trip_distance <- predict(distance_mod, df.taxi)
       df.taxi$fare_prediction <- predict(newmod1, df.taxi)
       df.taxi$lower_interval <- predict(newmod1, df.taxi, interval="predict")[2]
@@ -345,23 +338,22 @@ server <- function(input, output) {
                                              format(round(df.taxi$time_prediction, 0), nsmall=0), " minutes but could
                                              last as long as", format(round(df.taxi$upper_interval2,0), nsmall=0), "minutes."))
       mapdata <- cab2016 %>%
-        filter(pickup_zone==input$pickup_zone, dropoff_zone==input$dropoff_zone, pickup_hour == input$pickup_hour)
+        filter(pickup_zone==input$pickup_zone, dropoff_zone==input$dropoff_zone)
       
-      output$explanation <- renderText("The following map is representative of the hour your chose for pickup.
+      output$explanation <- renderText("The following map is representative of pickups and dropoffs.
                                        The blue dots represent cabs picking up fares in the same neighborhood you
                                        designated for pickup. The red dots represent cabs dropping off in the same 
                                        neighborhood that you designated for drop off.")
       output$Map2 <- renderLeaflet({
         leaflet(neighborhood_shape) %>%
-          addTiles() %>% 
-          addProviderTiles("CartoDB.Positron") %>%
+          addTiles(urlTemplate = "http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}&s=Ga", 
+                   attribution = 'Google') %>%
           addCircleMarkers(~mapdata$pickup_longitude, ~mapdata$pickup_latitude, radius = 1,
                            color = "blue", fillOpacity = 0.1) %>%
           addCircleMarkers(~mapdata$dropoff_longitude, ~mapdata$dropoff_latitude, radius = 1,
                            color = "red", fillOpacity = 0.1) %>%
           addMarkers(~mapdata$n_longitude.x, ~mapdata$n_latitude.x, popup=~mapdata$pickup_zone) %>%
           addMarkers(~mapdata$n_longitude.y, ~mapdata$n_latitude.y, popup=~mapdata$dropoff_zone) %>%
-          addPolylines(mapdata$pickup_longitude, mapdata$pickup_latitude, weight=1) %>%
           setView(-73.98, 40.75, zoom = 12)
       })
       #the following google maps output is adapted slightly from
@@ -389,9 +381,6 @@ server <- function(input, output) {
   
   }
 
-
 # Run the application 
 shinyApp(ui = ui, server = server)
-
-
 
