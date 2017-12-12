@@ -20,6 +20,8 @@ library(broom)
 library(httr)
 library(rgdal)
 library(googleway)
+library(shinythemes)
+library(lubridate)
 
 #Load the data
 jan2016 <- read.csv('jan1.csv')
@@ -225,20 +227,23 @@ leaflet(neighborhood_shape) %>%
   addProviderTiles("CartoDB.Positron") %>%
   setView(-73.98, 40.75, zoom = 12)
 
-#trying something crazy
+# API Key for Google Maps
 api_key <- "AIzaSyBMILnxtB-IgmBIjsaxYyZK_Y0LwoOvYIE"
 
+# Try to make date variable that just finds weekday
+
+nextyear <- data.frame(2018)
 
 # Define UI for application
-ui <- shinyUI(fluidPage(
-  span(titlePanel('Ca$h Cab'), style="color:#F9D90A"),
-  sidebarLayout(
+ui <- shinyUI(fluidPage(theme=shinytheme("slate"), 
+  span(titlePanel('CA$H CAB'), style="color:#F9D90A"),
+  sidebarLayout(position='right',
     sidebarPanel(
-      tags$style(".content, .container-fluid {background-color: #8897a6;}"),
+      textOutput('intro'),
+      h5(''),
+      #tags$style(".content, .container-fluid {background-image: #8897a6;}"),
       selectInput('pickup_month', 'Select Month', choices=as.character(unique(sort(cab2016$pickup_month)))),
       selectInput('pickup_day', 'Select Date', choices=as.character(unique(sort(cab2016$pickup_day)))),
-      selectInput('weekday', 'Select Day of Week', choices=as.character(unique(c('Sunday', 'Monday', 
-                                                                                 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')))),
       selectInput('pickup_hour', 'Select Hour of Pickup', 
                   choices=unique(sort(cab2016$pickup_hour))), 
       uiOutput('PBorough'),
@@ -248,16 +253,16 @@ ui <- shinyUI(fluidPage(
       actionButton("submit", "Submit")
     ),
     mainPanel(
-      span(h2('NYC Cab Fares and Trip Duration'), style="color:#F9D90A"),
-      span(h3('A Predictive Model'), style="color:#F9D90A"),
-      h5(textOutput("instructions")),
+      span(h3('Predicting NYC Cab Fares and Trip Duration'), style="color:#F9D90A"),
+      h4(textOutput("instructions")),
       h3(''),
       leafletOutput("Map1"),
-      h5(textOutput("prediction1")),
-      h5(textOutput("prediction3")),
-      h5(textOutput("prediction4")),
+      h4(textOutput("weekday1")),
+      h4(textOutput("prediction1")),
+      h4(textOutput("prediction3")),
+      h4(textOutput("prediction4")),
       h5(''),
-      h5(textOutput("explanation")),
+      h4(textOutput("explanation")),
       h5(''),
       leafletOutput("Map2"),
       h5(''),
@@ -269,6 +274,8 @@ ui <- shinyUI(fluidPage(
 
 # Define server
 server <- function(input, output) {
+  output$intro <- renderText("Please fill in the following information to plan a cab ride you wish to
+                             take in 2018.")
   output$PBorough <- renderUI(selectInput('pickup_borough',
                                           'Select Pickup Borough', c(unique(sort(cab2016$pickup_borough))))
   )
@@ -321,15 +328,18 @@ server <- function(input, output) {
   observeEvent(
     input$submit, {
       df.taxi <- data.frame(pickup_borough=input$pickup_borough, pickup_zone=input$pickup_zone, 
-                            weekday=input$weekday, dropoff_borough=input$dropoff_borough, 
+                            dropoff_borough=input$dropoff_borough, 
                             dropoff_zone=input$dropoff_zone, pickup_day=input$pickup_day,
                             pickup_hour=as.factor(input$pickup_hour), pickup_month=input$pickup_month)
+      df.taxi$weekday <- weekdays(ymd(paste0(nextyear$X2018, "-", as.numeric(input$pickup_month),
+                                             "-", as.numeric(input$pickup_day))))
+      output$weekday1 <- renderText(paste("The date you chose is a",df.taxi$weekday,"for the year 2018."))
       df.taxi$trip_distance <- predict(distance_mod, df.taxi)
       df.taxi$fare_prediction <- predict(newmod1, df.taxi)
       df.taxi$lower_interval <- predict(newmod1, df.taxi, interval="predict")[2]
       df.taxi$upper_interval <- predict(newmod1, df.taxi, interval="predict")[3]
-      output$prediction1 <- renderText(paste("Your trip is expected to cost $", 
-                                             format(round(df.taxi$fare_prediction, 2), nsmall=2), ", but could cost
+      output$prediction1 <- renderText(paste("Your trip is expected to cost $",
+                                             format(round(df.taxi$fare_prediction, 2), nsmall=2),"but could cost
                                              as much as $",format(round(df.taxi$upper_interval,2), nsmall=2), "."))
       df.taxi$time_prediction <- ceiling(predict(mod2, df.taxi))
       df.taxi$lower_interval2 <- predict(mod2, df.taxi, interval="predict")[2]
