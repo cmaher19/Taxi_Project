@@ -19,6 +19,8 @@ library(maptools)
 library(broom)
 library(httr)
 library(rgdal)
+install.packages("googleway")
+library(googleway)
 
 #Load the data
 jan2016 <- read.csv('jan1.csv')
@@ -229,9 +231,6 @@ leaflet(neighborhood_shape) %>%
 #setView(-73.98, 40.75, zoom = 12)
 
 #trying something crazy
-install.packages("googleway")
-library(googleway)
-
 api_key <- "AIzaSyBMILnxtB-IgmBIjsaxYyZK_Y0LwoOvYIE"
 
 
