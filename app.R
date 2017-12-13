@@ -7,23 +7,18 @@
 #    http://shiny.rstudio.com/
 #
 
-#Load necessary packages
+# Load necessary packages
 library(mdsr)
 library(shiny)
-library(tidyverse)
-library(leaflet)
-library(tigris)
-library(sp)
-library(ggmap)
-library(maptools)
 library(broom)
-library(httr)
+library(tidyverse)
 library(rgdal)
-library(googleway)
 library(shinythemes)
 library(lubridate)
+library(leaflet)
+library(googleway)
 
-#Load the data
+# Load the data
 jan2016 <- read.csv('jan1.csv')
 feb2016 <- read.csv('feb1.csv')
 mar2016 <- read.csv('mar1.csv')
@@ -33,14 +28,26 @@ jun2016 <- read.csv('jun1.csv')
 cab2016 <- rbind(jan2016, feb2016, mar2016, apr2016, may2016, jun2016)
 centroids <- read.csv('NHoodNameCentroids.csv')
 
-#clean centroid data
-centroids$longitude.latitude.section.borough <- as.character(centroids$longitude.latitude.section.borough)
+# DATA WRANGLING
 
+# Data Wrangling Part 1: Get information about neighborhood pickup and dropoff onto cab data
+
+# Clean centroid data
 centroids <- centroids %>%
+  mutate(longitude.latitude.section.borough = as.character(longitude.latitude.section.borough)) %>%
   separate(longitude.latitude.section.borough, into=c('n_longitude', 'n_latitude', 'neighborhood', 'borough'), sep=';') %>%
   mutate(n_longitude = as.numeric(n_longitude), n_latitude = as.numeric(n_latitude))
 
-#create a file with the taxi pickup and dropoff locations
+# There are four neighborhoods names that exist in two places
+# This is causing issues especially for the 'Chelsea' neighborhoods
+# because the one in Manhattan is oftentimes getting encoded as being in 
+# Staten Island
+repeat_neighborhoods <- centroids %>%
+  group_by(neighborhood) %>%
+  summarise(n=n()) %>%
+  filter(n>1)
+
+# Create a file with the taxi pickup and dropoff locations
 coordinates <- cab2016 %>%
   select(pickup_longitude, pickup_latitude, dropoff_longitude, dropoff_latitude)
 write.csv(coordinates, 'cab_coordinates.csv')
@@ -56,105 +63,150 @@ pickup_distance <- function(m,n) {
   sqrt((cab_coordinates$pickup_latitude[n] - centroids$n_latitude[m])^2 + (cab_coordinates$pickup_longitude[n] - centroids$n_longitude[m])^2)
 }
 
-distance <- lapply(m,n, FUN=pickup_distance)
-distance <- as.data.frame(distance)
-colnames(distance) = centroids[,3]
-pickup_nhood <- colnames(distance)[apply(distance, 1, which.min)]
-pickup_nhood <- as.data.frame(pickup_nhood)
+start_distance <- lapply(m,n, FUN=pickup_distance)
+start_distance <- data.frame(start_distance)
+colnames(start_distance) = centroids[,3]
+pickup_nhood <- colnames(start_distance)[apply(start_distance, 1, which.min)]
+pickup_nhood <- data.frame(pickup_nhood)
 
 # Find nearest neighborhood for dropoff based on coordinates
 dropoff_distance <- function(m,n) {
   sqrt((cab_coordinates$dropoff_latitude[n] - centroids$n_latitude[m])^2 + (cab_coordinates$dropoff_longitude[n] - centroids$n_longitude[m])^2)
 }
 
-distance1 <- lapply(m,n, FUN=dropoff_distance)
-distance1 <- as.data.frame(distance1)
-colnames(distance1) = centroids[,3]
-dropoff_nhood <- colnames(distance1)[apply(distance1, 1, which.min)]
-dropoff_nhood <- as.data.frame(dropoff_nhood)
+end_distance <- lapply(m,n, FUN=dropoff_distance)
+end_distance <- data.frame(end_distance)
+colnames(end_distance) = centroids[,3]
+dropoff_nhood <- colnames(end_distance)[apply(end_distance, 1, which.min)]
+dropoff_nhood <- data.frame(dropoff_nhood)
 
-
-# Bind the two neighborhoods (pickup and dropoff) into one data frame
+# Bind the two neighborhoods (pickup and dropoff) and add to the cab dataset
 neighborhoods <- cbind(pickup_nhood, dropoff_nhood)
 cab2016 <- cbind(cab2016, neighborhoods)
 
-#join neighborhood centroid data onto yellow cab data for both pickup and dropoff location
+# Join neighborhood centroid data onto yellow cab data for both pickup and dropoff location
+# We need neighborhood lat and long in later mapping
+# The warning message here is fine - it did some of the work for us by making the neighborhood
+# variables in the cab dataset into characters
 cab2016 <- left_join(cab2016, centroids, by=c('pickup_nhood'='neighborhood')) %>%
   rename(pickup_borough = borough, pickup_zone=pickup_nhood)
-
 
 cab2016 <- left_join(cab2016, centroids, by=c('dropoff_nhood'='neighborhood')) %>%
   rename(dropoff_borough = borough, dropoff_zone=dropoff_nhood)
 
+# Data Wrangling Part Two: Clean up cab2016 dataset 
 
-#DATA WRANGLING
-
-#Convert pickup and dropoff date and time information into date-time objects
+# Convert pickup and dropoff date and time information into date-time objects
 cab2016 <- cab2016 %>%
   mutate(tpep_pickup_datetime = as.POSIXct(tpep_pickup_datetime),
-         tpep_dropoff_datetime = as.POSIXct(tpep_dropoff_datetime))
+         tpep_dropoff_datetime = as.POSIXct(tpep_dropoff_datetime)) 
 
-
-#Create a total trip duration variable (in minutes)
+# Create a total trip duration variable (in minutes)
 cab2016 <- cab2016 %>%
   mutate(trip_duration = difftime(tpep_dropoff_datetime, tpep_pickup_datetime, unit='min'))
 
-
-#Split date and time pick up and drop off variables into two separate variables each 
-#(one for date and one for time)
+# Split the data and time aspects into two separate variables
+# Trim extra space from the front of the time variables
+# Convert pickup date into actual date variable
 cab2016 <- cab2016 %>%
   separate(tpep_pickup_datetime, into=c('pickup_date', 'pickup_time'), sep=10) %>%
-  separate(tpep_dropoff_datetime, into=c('dropoff_date', 'dropoff_time'), sep=10)
-
-
-#Remove the extra space in front of time variables
-cab2016 <- cab2016 %>%
+  separate(tpep_dropoff_datetime, into=c('dropoff_date', 'dropoff_time'), sep=10) %>%
   mutate(pickup_time = trimws(pickup_time, which='left'),
          dropoff_time = trimws(dropoff_time, which='left'))
 
-#Separate the time variables into hours and minutes and seconds, then factor them
+# Separate the time variables into hours and minutes and seconds, then factor them
+# After going through all of our analyses, we never used minutes or seconds so I'm going
+# to remove them here
 cab2016 <- cab2016 %>%
   separate(pickup_time, into = c('pickup_hour', 'pickup_minute', 'pickup_seconds'), sep=':') %>%
   separate(dropoff_time, into = c('dropoff_hour', 'dropoff_minute', 'dropoff_seconds'), sep=':') %>%
-  mutate(pickup_hour = as.factor(pickup_hour), pickup_minute = as.factor(pickup_minute),
-         dropoff_hour = as.factor(dropoff_hour), dropoff_minute = as.factor(dropoff_minute)) 
+  mutate(pickup_hour = as.factor(pickup_hour), dropoff_hour = as.factor(dropoff_hour)) %>%
+  select(-pickup_minute, -pickup_seconds, -dropoff_minute, -dropoff_seconds)
 
-
-#Convert pickup and dropoff dates to actual date variables
+# Convert pickup and dropoff dates to actual date variables so that weekday can be extracted
 cab2016 <- cab2016 %>%
-  mutate(pickup_date = as.Date(pickup_date), dropoff_date = as.Date(dropoff_date))
-
-
-#Extract weekday from dates so that it can be used in later models/predictions
-cab2016 <- cab2016 %>%
+  mutate(pickup_date = as.Date(pickup_date), dropoff_date = as.Date(dropoff_date)) %>%
   mutate(weekday = weekdays(pickup_date))
-
 
 # Separate date variables into year, month, and day separately so that they are easier to 
 # match with user input
+# Convert to factors for model building
 cab2016 <- cab2016 %>%
   separate(pickup_date, into=c('pickup_year', 'pickup_month', 'pickup_day'), sep='-') %>%
-  separate(dropoff_date, into=c('dropoff_year', 'dropoff_month', 'dropoff_day'), sep='-')
-
-
-#Convert month and day to factors for later use in predictive models
-cab2016 <- cab2016 %>%
+  separate(dropoff_date, into=c('dropoff_year', 'dropoff_month', 'dropoff_day'), sep='-') %>%
   mutate(pickup_month = as.factor(pickup_month), pickup_day = as.factor(pickup_day),
          dropoff_month = as.factor(dropoff_month), dropoff_day = as.factor(dropoff_day))
 
-
 # Filter out observations with pickup/dropoff coordinates with zeroes and rates other 
 # than the standard fare rates (there were some shady exchanges in the nonstandard fare options)
+# Also removing variables that we didn't use
+# All of the payment variables were summed in the total amount, so we removed individual charges
 cab2016 <- cab2016 %>%
-  filter(RatecodeID == 1, pickup_longitude != 0, dropoff_longitude != 0, total_amount < 2000, total_amount > 0)
+  filter(RatecodeID == 1, pickup_longitude != 0, dropoff_longitude != 0) %>%
+  select(-VendorID, -store_and_fwd_flag, -payment_type, -fare_amount, -extra, -mta_tax, -tip_amount, 
+         -tolls_amount, -improvement_surcharge)
+
+# UNIVARIATE ANALYSES
+
+# Look at and do some filtering on total amount ($ spent on cab ride)
+cab2016 %>%
+  filter(total_amount < 75) %>%
+  ggplot(aes(x=total_amount)) + geom_density(fill='purple', alpha=0.2) + xlab('Total Amount of Fare ($)') + ylab('Density') +
+  ggtitle('Density of Total $ Spent on Cab Ride')
+
+cab2016 %>%
+  filter(total_amount > 75) %>%
+  summarise(n=n()) # only 50 rides that cost more than 75 dollars, we can do without them
+
+cab2016 <- cab2016 %>%
+  filter(total_amount < 75 & total_amount > 0)
+
+# Look at and do some filtering on trip duration
+cab2016 %>%
+  filter(trip_duration < 75) %>%
+  ggplot(aes(x=trip_duration)) + geom_density(fill='purple', alpha=0.2) + xlab('Trip Duration (minutes)') + ylab('Density') +
+  ggtitle('Density of Trip Durations (in minutes)')
+
+cab2016 %>%
+  filter(trip_duration > 75) %>%
+  summarise(n=n()) # only 125 rides that were longer than 75 minutes, we can do without them
+
+cab2016 <- cab2016 %>%
+  filter(trip_duration < 75)
+
+# Look at and filter trip distance
+cab2016 %>%
+  ggplot(aes(x=trip_distance)) + geom_density()
+
+# Some of these are literally not possible with my knowledge of New York
+# For example, the distance between Midtown and Chelsea could not possibly be zero
+# We are going to filter out trips with distances of zero that somehow went
+# from one neighborhood to another
+cab2016 %>%
+  filter(trip_distance==0 & pickup_zone != dropoff_zone)
+
+cab2016 %>%
+  filter(trip_distance > 20) #I'm only going to remove the two of these that are definitely wrong, I'll filter out trips >27mi
+
+cab2016 <- cab2016 %>%
+  filter(trip_distance != 0 & trip_distance < 27)
 
 
 #MODEL BUILDING
-#Take user input and use it to build predictive models for fare prediction and time duration
+# End goal: Take user input and use it to build predictive models for fare prediction and time duration
 
-#Model to describe total fare amount based on variables that we will have from user input
-#Cant put month variable in until we are using full dataset due to small level of factors (i.e. 1)
-#First build model to predict trip_distance, then use that prediction in this model
+# Building trip distance model: exploring relationships and testing model itself
+cab2016 %>%
+  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_borough)) + geom_boxplot() + facet_grid(pickup_borough~.) +
+  theme(axis.text.x=element_text(angle=90, hjust=1))
+
+
+distance_mod <- lm(trip_distance ~ pickup_zone + dropoff_zone, data=cab2016)
+summary(distance_mod)
+
+cab2016$distance_prediction <- predict(distance_mod, cab2016)
+plot(distance_mod)
+
 
 #Visualize relationship between trip distance and total fare --> pretty strong upward linear trend
 cab2016 %>%
@@ -162,36 +214,14 @@ cab2016 %>%
   facet_grid(pickup_borough~.) + ggtitle('Relationship between Fare and Trip Distance') +
   xlab('Trip Distance') + ylab('Total Amount ($)') + labs(color = 'Pickup Borough')
 
-#Should we filter out the super far trips? May lose some information about some boroughs to far away boroughs
-#But it would probably make the distribution a lot more normal
-ggplot(cab2016, aes(x=trip_distance)) + geom_density()
+#MODEL: Using trip distance to predict total fare amount, adj R^2 is 0.9128 (yay!)
 
-cab2016 <- cab2016 %>%
-  filter(trip_distance < 20)
-
-#MODEL: Using trip distance to predict total fare amount, adj R^2 is 0.8954 (yay!)
-#mod1 <- lm(total_amount ~ trip_distance, data=cab2016)
-#summary(mod1)
-
-newmod1 <- lm(total_amount ~ pickup_zone + dropoff_zone + pickup_hour
+total_mod <- lm(total_amount ~ pickup_zone + dropoff_zone + pickup_hour
               + weekday + trip_distance, data=cab2016)
-summary(newmod1)
-
-#Visualize relationship between trip distance and pickup_zone
-#Do that here but also figure out what to do since pickup_zone has hundreds of factors
-
-
-#MODEL: Using pickup and dropoff zone to predict trip distance
-distance_mod <- lm(trip_distance ~ pickup_zone + dropoff_zone + pickup_hour, data=cab2016)
-summary(distance_mod)
-
-cab2016$distance_prediction <- predict(distance_mod, cab2016)
-#plot(distance)
+summary(total_mod)
 
 
 
-#cab2016$factor_pickup = factor(x = cab2016$pickup_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
-#cab2016$factor_dropoff = factor(x = cab2016$dropoff_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
 cab2016$trip_duration = as.numeric(cab2016$trip_duration)
 
 #density of trip_duration
@@ -223,9 +253,6 @@ file <- ('our_neighborhoods.geojson')
 neighborhood_shape <- readOGR(dsn = file, layer = "our_neighborhoods")
 neighborhood_shape_df <- tidy(neighborhood_shape)
 
-leaflet(neighborhood_shape) %>%
-  addProviderTiles("CartoDB.Positron") %>%
-  setView(-73.98, 40.75, zoom = 12)
 
 # API Key for Google Maps
 api_key <- "AIzaSyBMILnxtB-IgmBIjsaxYyZK_Y0LwoOvYIE"
@@ -239,7 +266,7 @@ ui <- shinyUI(fluidPage(theme=shinytheme("slate"),
   span(titlePanel('CA$H CAB'), style="color:#F9D90A"),
   sidebarLayout(position='right',
     sidebarPanel(
-      textOutput('intro'),
+      h4(textOutput('intro')),
       h5(''),
       #tags$style(".content, .container-fluid {background-image: #8897a6;}"),
       selectInput('pickup_month', 'Select Month', choices=as.character(unique(sort(cab2016$pickup_month)))),
@@ -335,9 +362,9 @@ server <- function(input, output) {
                                              "-", as.numeric(input$pickup_day))))
       output$weekday1 <- renderText(paste("The date you chose is a",df.taxi$weekday,"for the year 2018."))
       df.taxi$trip_distance <- predict(distance_mod, df.taxi)
-      df.taxi$fare_prediction <- predict(newmod1, df.taxi)
-      df.taxi$lower_interval <- predict(newmod1, df.taxi, interval="predict")[2]
-      df.taxi$upper_interval <- predict(newmod1, df.taxi, interval="predict")[3]
+      df.taxi$fare_prediction <- predict(total_mod, df.taxi)
+      df.taxi$lower_interval <- predict(total_mod, df.taxi, interval="predict")[2]
+      df.taxi$upper_interval <- predict(total_mod, df.taxi, interval="predict")[3]
       output$prediction1 <- renderText(paste("Your trip is expected to cost $",
                                              format(round(df.taxi$fare_prediction, 2), nsmall=2),"but could cost
                                              as much as $",format(round(df.taxi$upper_interval,2), nsmall=2), "."))
@@ -368,9 +395,14 @@ server <- function(input, output) {
       })
       #the following google maps output is adapted slightly from
       #https://stackoverflow.com/questions/42026578/drawing-journey-path-using-leaflet-in-r
+      
+      #our attempt at restricting the maps to nyc only - we were getting weird routes before this restriction
+      df.taxi$region <- paste("new york city", df.taxi$pickup_zone, sep=" ")
+      df.taxi$region1 <- paste("new york city", df.taxi$dropoff_zone, sep=" ")
+      
       route <- eventReactive(input$submit,{
-        origin <- input$pickup_zone
-        destination <- input$dropoff_zone
+        origin <- df.taxi$region
+        destination <- df.taxi$region1
         
         return(data.frame(origin, destination, stringsAsFactors = F))
         
