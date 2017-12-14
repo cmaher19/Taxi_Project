@@ -365,7 +365,7 @@ cab2016 %>%
 # Not showing many plots for pickup zone and dropoff zone here but they look similar to the ones
 # in the previous models (one example is below)
 cab2016 %>%
-  filter(dropoff_borough == "Brooklyn") %>%
+  filter(pickup_borough == "Brooklyn") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
   ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Brooklyn') + labs(color = 'Pickup Zone')
