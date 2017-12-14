@@ -87,6 +87,8 @@ map <- addMarkers(map, lng=-73.9712, lat=40.7831, popup="Manhattan")
 map <- addMarkers(map, lng=-73.7949, lat=40.7282, popup="Queens")
 map
 
+format(round(df.taxi$trip_duration, 0), nsmall=0)
+format(round(df.taxi$upper_interval2,0), nsmall=0)
 
 #cab2016$factor_pickup = factor(x = cab2016$pickup_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))
 #cab2016$factor_dropoff = factor(x = cab2016$dropoff_borough,levels = c("Bronx", "Brooklyn", "Manhattan", "Staten Island", "Queens"))

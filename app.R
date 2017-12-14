@@ -16,7 +16,7 @@ library(rgdal)
 library(shinythemes)
 library(lubridate)
 library(leaflet)
-library(googleway)
+library(ggmap)
 
 # Load the data
 jan2016 <- read.csv('jan1.csv')
@@ -46,6 +46,14 @@ repeat_neighborhoods <- centroids %>%
   group_by(neighborhood) %>%
   summarise(n=n()) %>%
   filter(n>1)
+
+# For Chelsea and Murray Hill, I kept the Manhattan locations
+# For Sunnyside and Bay Terrace, I kept the Queens locations
+centroids <- centroids[-247,]
+centroids <- centroids[-238,]
+centroids <- centroids[-183,]
+centroids <- centroids[-223,]
+
 
 # Create a file with the taxi pickup and dropoff locations
 coordinates <- cab2016 %>%
@@ -169,14 +177,12 @@ cab2016 %>%
 
 cab2016 %>%
   filter(trip_duration > 75) %>%
-  summarise(n=n()) # only 125 rides that were longer than 75 minutes, we can do without them
+  summarise(n=n()) # only 87 rides that were longer than 75 minutes, we can do without them
 
 cab2016 <- cab2016 %>%
   filter(trip_duration < 75)
 
 # Look at and filter trip distance
-cab2016 %>%
-  ggplot(aes(x=trip_distance)) + geom_density()
 
 # Some of these are literally not possible with my knowledge of New York
 # For example, the distance between Midtown and Chelsea could not possibly be zero
@@ -196,16 +202,78 @@ cab2016 <- cab2016 %>%
 # End goal: Take user input and use it to build predictive models for fare prediction and time duration
 
 # Building trip distance model: exploring relationships and testing model itself
+# There are major differences in trip distance based on starting zone so this
+# will be a nice thing to include in the model
+# Graphs broken down by borough to make it more readable
 cab2016 %>%
-  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_borough)) + geom_boxplot() + facet_grid(pickup_borough~.) +
-  theme(axis.text.x=element_text(angle=90, hjust=1))
+  filter(pickup_borough == "Bronx") %>%
+  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in the Bronx') + labs(color = 'Pickup Borough')
+cab2016 %>%
+  filter(pickup_borough == "Brooklyn") %>%
+  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Brooklyn') + labs(color = 'Pickup Borough')
+cab2016 %>%
+  filter(pickup_borough == "Manhattan") %>%
+  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Manhattan') + labs(color = 'Pickup Borough')
+cab2016 %>%
+  filter(pickup_borough == "Queens") %>%
+  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Queens') + labs(color = 'Pickup Borough')
+cab2016 %>%
+  filter(pickup_borough == "Staten Island") %>%
+  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Staten Island') + labs(color = 'Pickup Borough')
 
+# Same graphs but for dropoff zone instead of pickup zone
+# You have to zoom these graphs to see them in full
+cab2016 %>%
+  filter(dropoff_borough == "Bronx") %>%
+  ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in the Bronx') + labs(color = 'Dropoff Borough')
+cab2016 %>%
+  filter(dropoff_borough == "Brooklyn") %>%
+  ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Brooklyn') + labs(color = 'Dropoff Borough')
+cab2016 %>%
+  filter(dropoff_borough == "Manhattan") %>%
+  ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Manhattan') + labs(color = 'Dropoff Borough')
+cab2016 %>%
+  filter(dropoff_borough == "Queens") %>%
+  ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Queens') + labs(color = 'Dropoff Borough')
+cab2016 %>%
+  filter(dropoff_borough == "Staten Island") %>%
+  ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Staten Island') + labs(color = 'Dropoff Borough')
 
-distance_mod <- lm(trip_distance ~ pickup_zone + dropoff_zone, data=cab2016)
+# Create model
+# We tried models with other things but they never helped the performance of the model
+# The models R squared value is okay but the diagnostic plots look horrible
+# There is definitely a better way to do this but we didn't find it
+distance_mod <- lm(trip_distance ~ pickup_zone + dropoff_zone + pickup_borough
+                   + dropoff_borough, data=cab2016)
 summary(distance_mod)
+plot(which=1, distance_mod)
+plot(which=2, distance_mod)
+plot(which=4, distance_mod)
+plot(which=5, distance_mod)
+leveragePlots(distance_mod)
 
-cab2016$distance_prediction <- predict(distance_mod, cab2016)
-plot(distance_mod)
+cab2016 <- cab2016 %>%
+  mutate(distance_prediction = predict(distance_mod, cab2016))
 
 
 #Visualize relationship between trip distance and total fare --> pretty strong upward linear trend
@@ -214,26 +282,26 @@ cab2016 %>%
   facet_grid(pickup_borough~.) + ggtitle('Relationship between Fare and Trip Distance') +
   xlab('Trip Distance') + ylab('Total Amount ($)') + labs(color = 'Pickup Borough')
 
-#MODEL: Using trip distance to predict total fare amount, adj R^2 is 0.9128 (yay!)
+#MODEL: Using trip distance to predict total fare amount, adj R^2 is 0.9161 (yay!)
+# Conditions look better than the last one but still not great
 
-total_mod <- lm(total_amount ~ pickup_zone + dropoff_zone + pickup_hour
-              + weekday + trip_distance, data=cab2016)
+testing <- cab2016 %>%
+  filter(trip_distance < 2 & trip_duration > 30)
+
+
+total_mod <- lm(total_amount ~ pickup_hour + weekday + trip_distance + pickup_zone + dropoff_zone, data=cab2016)
 summary(total_mod)
-
-
-
-cab2016$trip_duration = as.numeric(cab2016$trip_duration)
-
-#density of trip_duration
-cab2016 %>%
-  filter(trip_duration < 60) %>% #made decision to do less than 60 because it skews heavily right with 
-  #very low density after that cut off
-  ggplot(aes(x=trip_duration)) + geom_density()
+plot(which=1, total_mod)
+plot(which=2, total_mod)
+plot(which=4, total_mod) # this is very weird, the ones that are really high have perfect predictions
 
 cab2016 <- cab2016 %>%
-  filter(trip_duration < 60)
+  mutate(fare_prediction = predict(total_mod, cab2016))
 
 #trying to build useful trip duration model
+cab2016 <- cab2016 %>%
+  mutate(trip_duration = as.numeric(trip_duration))
+
 cab2016 %>%
   ggplot(aes(x=pickup_borough, y=trip_duration)) + geom_boxplot()
 
