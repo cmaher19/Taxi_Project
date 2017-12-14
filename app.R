@@ -1,11 +1,4 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the ‘Run App’ button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
+# If you just click the Run App button, this should work.
 
 # Load necessary packages
 library(mdsr)
@@ -17,6 +10,8 @@ library(shinythemes)
 library(lubridate)
 library(leaflet)
 library(ggmap)
+library(googleway)
+
 
 # Load the data
 jan2016 <- read.csv('jan1.csv')
@@ -158,16 +153,16 @@ cab2016 <- cab2016 %>%
 
 # Look at and do some filtering on total amount ($ spent on cab ride)
 cab2016 %>%
-  filter(total_amount < 75) %>%
+  filter(total_amount < 60) %>%
   ggplot(aes(x=total_amount)) + geom_density(fill='purple', alpha=0.2) + xlab('Total Amount of Fare ($)') + ylab('Density') +
   ggtitle('Density of Total $ Spent on Cab Ride')
 
 cab2016 %>%
-  filter(total_amount > 75) %>%
-  summarise(n=n()) # only 50 rides that cost more than 75 dollars, we can do without them
+  filter(total_amount > 60) %>%
+  summarise(n=n()) # only 122 rides that cost more than 75 dollars, we can do without them
 
 cab2016 <- cab2016 %>%
-  filter(total_amount < 75 & total_amount > 0)
+  filter(total_amount < 60 & total_amount > 0)
 
 # Look at and do some filtering on trip duration
 cab2016 %>%
@@ -198,38 +193,43 @@ cab2016 <- cab2016 %>%
   filter(trip_distance != 0 & trip_distance < 27)
 
 
-#MODEL BUILDING
+# MODEL BUILDING 
 # End goal: Take user input and use it to build predictive models for fare prediction and time duration
 
-# Building trip distance model: exploring relationships and testing model itself
-# There are major differences in trip distance based on starting zone so this
-# will be a nice thing to include in the model
+# MODEL BUILDING PART ONE: trip distance (this wasn't one of the two model we said we'd build but it is useful to 
+# use in conjunction with the other models)
+
 # Graphs broken down by borough to make it more readable
+# There are clear differences between zones --> use in model
 cab2016 %>%
   filter(pickup_borough == "Bronx") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in the Bronx') + labs(color = 'Pickup Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in the Bronx') + labs(color = 'Pickup Zone')
+
 cab2016 %>%
   filter(pickup_borough == "Brooklyn") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Brooklyn') + labs(color = 'Pickup Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Brooklyn') + labs(color = 'Pickup Zone')
+
 cab2016 %>%
   filter(pickup_borough == "Manhattan") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Manhattan') + labs(color = 'Pickup Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Manhattan') + labs(color = 'Pickup Zone')
+
 cab2016 %>%
   filter(pickup_borough == "Queens") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Queens') + labs(color = 'Pickup Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Queens') + labs(color = 'Pickup Zone')
+
 cab2016 %>%
   filter(pickup_borough == "Staten Island") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Staten Island') + labs(color = 'Pickup Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Staten Island') + labs(color = 'Pickup Zone')
 
 # Same graphs but for dropoff zone instead of pickup zone
 # You have to zoom these graphs to see them in full
@@ -237,27 +237,32 @@ cab2016 %>%
   filter(dropoff_borough == "Bronx") %>%
   ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in the Bronx') + labs(color = 'Dropoff Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in the Bronx') + labs(color = 'Dropoff Zone')
+
 cab2016 %>%
   filter(dropoff_borough == "Brooklyn") %>%
   ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Brooklyn') + labs(color = 'Dropoff Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Brooklyn') + labs(color = 'Dropoff Zone')
+
 cab2016 %>%
   filter(dropoff_borough == "Manhattan") %>%
   ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Manhattan') + labs(color = 'Dropoff Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Manhattan') + labs(color = 'Dropoff Zone')
+
 cab2016 %>%
   filter(dropoff_borough == "Queens") %>%
   ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Queens') + labs(color = 'Dropoff Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Queens') + labs(color = 'Dropoff Zone')
+
 cab2016 %>%
   filter(dropoff_borough == "Staten Island") %>%
   ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
-  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Staten Island') + labs(color = 'Dropoff Borough')
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Dropoff Zone in Staten Island') + 
+  labs(color = 'Dropoff Zone')
 
 # Create model
 # We tried models with other things but they never helped the performance of the model
@@ -270,26 +275,62 @@ plot(which=1, distance_mod)
 plot(which=2, distance_mod)
 plot(which=4, distance_mod)
 plot(which=5, distance_mod)
-leveragePlots(distance_mod)
 
 cab2016 <- cab2016 %>%
   mutate(distance_prediction = predict(distance_mod, cab2016))
 
+# MODEL BUILDING PART TWO: Total fare amount ($)
 
-#Visualize relationship between trip distance and total fare --> pretty strong upward linear trend
+# We had trouble with these high outliers with every variable
+# There is a bit of variation (a few dollars) between hours so this may be useful
 cab2016 %>%
-  ggplot(aes(x=trip_distance, y=total_amount, col=pickup_borough)) + geom_point(alpha=0.2) + 
+  ggplot(aes(x=pickup_hour, y=total_amount, col=pickup_hour)) + geom_boxplot() + xlab('Pickup Hour') +
+  ylab('Total Fare Amount ($)') + ggtitle('Total Fare Amount by Hour') + labs(color='Pickup Hour')
+
+# Visualize relationship between trip distance and total fare --> upward linear trend
+# We can see from the shading of the dots that there were some low mileage trips that took a
+# long time and costed a lot (especially in Manhattan which is understandable)
+cab2016 %>%
+  ggplot(aes(x=trip_distance, y=total_amount, col=trip_duration)) + geom_point(alpha=0.1) + 
   facet_grid(pickup_borough~.) + ggtitle('Relationship between Fare and Trip Distance') +
-  xlab('Trip Distance') + ylab('Total Amount ($)') + labs(color = 'Pickup Borough')
+  xlab('Trip Distance') + ylab('Total Amount ($)') + labs(color = 'Trip Duration') + 
+  scale_color_gradient(low='yellow', high='purple')
 
-#MODEL: Using trip distance to predict total fare amount, adj R^2 is 0.9161 (yay!)
+# Same plots as above but for total amount by pickup zone - each graph represent a borough
+# We are not putting all of them here but there are obvious differences between pickup zones
+# so that should be included in the model
+# Use zoom function to see plots better
+cab2016 %>%
+  filter(pickup_borough == "Bronx") %>%
+  ggplot(aes(x=pickup_zone, y=total_amount, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Total Amount') + ggtitle('Total Amount by Pickup Zone in the Bronx') + labs(color = 'Pickup Zone')
+
+cab2016 %>%
+  filter(pickup_borough == "Brooklyn") %>%
+  ggplot(aes(x=pickup_zone, y=total_amount, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Total Amount') + ggtitle('Total Amount by Pickup Zone in Brooklyn') + labs(color = 'Pickup Zone')
+
+# Same plots as above but for total amount by dropoff zone - each graph represent a borough
+# We are not putting all of them here but there are obvious differences between dropoff zones
+# so that should be included in the model
+# Use zoom function to see plots better
+cab2016 %>%
+  filter(dropoff_borough == "Bronx") %>%
+  ggplot(aes(x=dropoff_zone, y=total_amount, col=dropoff_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
+  ylab('Total Amount') + ggtitle('Total Amount by Dropoff Zone in the Bronx') + labs(color = 'Dropoff Zone')
+
+cab2016 %>%
+  filter(dropoff_borough == "Brooklyn") %>%
+  ggplot(aes(x=dropoff_zone, y=total_amount, col=dropoff_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
+  ylab('Total Amount') + ggtitle('Total Amount by Dropoff Zone in Brooklyn') + labs(color = 'Dropoff Zone')
+
+
 # Conditions look better than the last one but still not great
-
-testing <- cab2016 %>%
-  filter(trip_distance < 2 & trip_duration > 30)
-
-
-total_mod <- lm(total_amount ~ pickup_hour + weekday + trip_distance + pickup_zone + dropoff_zone, data=cab2016)
+total_mod <- lm(total_amount ~ pickup_hour + trip_distance + pickup_zone + dropoff_zone, data=cab2016)
 summary(total_mod)
 plot(which=1, total_mod)
 plot(which=2, total_mod)
@@ -298,35 +339,55 @@ plot(which=4, total_mod) # this is very weird, the ones that are really high hav
 cab2016 <- cab2016 %>%
   mutate(fare_prediction = predict(total_mod, cab2016))
 
-#trying to build useful trip duration model
+# MODEL BUILDING PART THREE: Trip duration predictions
+
+# Get variable in form that we can work with
 cab2016 <- cab2016 %>%
   mutate(trip_duration = as.numeric(trip_duration))
 
+# We see some slight differences here, especially with Queens
 cab2016 %>%
-  ggplot(aes(x=pickup_borough, y=trip_duration)) + geom_boxplot()
+  ggplot(aes(x=pickup_borough, y=trip_duration, col=pickup_borough)) + geom_boxplot() + xlab('Pickup Borough') +
+  ylab('Trip Duration (mins)') + ggtitle('Trip Duration by Pickup Borough') + labs(color='Pickup Borough') + 
+  theme(axis.text.x=element_text(angle=90, hjust=1))
 
+# We see bigger differences here, so we'll definitely use this 
 cab2016 %>%
-  ggplot(aes(x=dropoff_borough, y=trip_duration)) + geom_boxplot()
+  ggplot(aes(x=dropoff_borough, y=trip_duration, col=dropoff_borough)) + geom_boxplot() + xlab('Dropoff Borough') +
+  ylab('Trip Duration (mins)') + ggtitle('Trip Duration by Dropoff Borough') + labs(color='Dropoff Borough') + 
+  theme(axis.text.x=element_text(angle=90, hjust=1))
 
+# Trip duration against trip distance colored by the pickup borough
+# There is definitely a relationship here but it doesn't seem quite linear
 cab2016 %>%
-  group_by(dropoff_borough) %>%
-  ggplot(aes(x=dropoff_borough, y=trip_duration)) + geom_boxplot()
+  ggplot(aes(x=trip_distance, y=trip_duration, col=pickup_borough)) + geom_point(alpha=0.4)
 
-#final model for predicting trip duration (in minutes)
-mod2 <- lm(trip_duration ~ pickup_zone + dropoff_zone + pickup_hour + trip_distance + pickup_month, data=cab2016)
-summary(mod2)
+# Not showing many plots for pickup zone and dropoff zone here but they look similar to the ones
+# in the previous models (one example is below)
+cab2016 %>%
+  filter(dropoff_borough == "Brooklyn") %>%
+  ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
+  ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Brooklyn') + labs(color = 'Pickup Zone')
 
+# Final model for predicting trip duration (in minutes)
+# The conditions still don't look good 
+duration_model <- lm(trip_duration ~ pickup_zone + dropoff_zone + pickup_hour + trip_distance, data=cab2016)
+summary(duration_model)
+plot(which=1, duration_model)
+plot(which=2, duration_model)
+plot(which=4, duration_model)
+
+# STUFF WE NEED FOR MAPPING
 # Prepare shapefile for use
 file <- ('our_neighborhoods.geojson')
 neighborhood_shape <- readOGR(dsn = file, layer = "our_neighborhoods")
 neighborhood_shape_df <- tidy(neighborhood_shape)
 
-
 # API Key for Google Maps
 api_key <- "AIzaSyBMILnxtB-IgmBIjsaxYyZK_Y0LwoOvYIE"
 
-# Try to make date variable that just finds weekday
-
+# We need this in order to say the weekday in 2018 for the date that the user chose
 nextyear <- data.frame(2018)
 
 # Define UI for application
@@ -336,15 +397,13 @@ ui <- shinyUI(fluidPage(theme=shinytheme("slate"),
     sidebarPanel(
       h4(textOutput('intro')),
       h5(''),
-      #tags$style(".content, .container-fluid {background-image: #8897a6;}"),
-      selectInput('pickup_month', 'Select Month', choices=as.character(unique(sort(cab2016$pickup_month)))),
-      selectInput('pickup_day', 'Select Date', choices=as.character(unique(sort(cab2016$pickup_day)))),
-      selectInput('pickup_hour', 'Select Hour of Pickup', 
-                  choices=unique(sort(cab2016$pickup_hour))), 
-      uiOutput('PBorough'),
-      uiOutput('PNeighborhood'),
-      uiOutput('DBorough'),
-      uiOutput('DNeighborhood'),
+      selectInput('pickup_month', 'Select Month:', choices=as.character(unique(sort(cab2016$pickup_month)))),
+      selectInput('pickup_day', 'Select Date:', choices=as.character(unique(sort(cab2016$pickup_day)))),
+      selectInput('pickup_hour', 'Select Hour of Pickup:', choices=unique(sort(cab2016$pickup_hour))), 
+      uiOutput('pickup_borough'),
+      uiOutput('pickup_zone'),
+      uiOutput('dropoff_borough'),
+      uiOutput('dropoff_zone'),
       actionButton("submit", "Submit")
     ),
     mainPanel(
@@ -354,8 +413,7 @@ ui <- shinyUI(fluidPage(theme=shinytheme("slate"),
       leafletOutput("Map1"),
       h4(textOutput("weekday1")),
       h4(textOutput("prediction1")),
-      h4(textOutput("prediction3")),
-      h4(textOutput("prediction4")),
+      h4(textOutput("prediction2")),
       h5(''),
       h4(textOutput("explanation")),
       h5(''),
@@ -371,47 +429,27 @@ ui <- shinyUI(fluidPage(theme=shinytheme("slate"),
 server <- function(input, output) {
   output$intro <- renderText("Please fill in the following information to plan a cab ride you wish to
                              take in 2018.")
-  output$PBorough <- renderUI(selectInput('pickup_borough',
-                                          'Select Pickup Borough', c(unique(sort(cab2016$pickup_borough))))
-  )
-  output$PNeighborhood <- renderUI(
+  output$pickup_borough <- renderUI(selectInput('pickup_borough',
+                                          'Select Pickup Borough:', c(unique(sort(cab2016$pickup_borough)))))
+  output$pickup_zone <- renderUI(
     if(is.null(input$pickup_borough)) {return()}
-    else selectInput('pickup_zone', 'Select Pickup Neighborhood',
-                     c(unique(sort(cab2016$pickup_zone[which(cab2016$pickup_borough == input$pickup_borough)])))
-    ))
+    else selectInput('pickup_zone', 'Select Pickup Neighborhood:',
+                     c(unique(sort(cab2016$pickup_zone[which(cab2016$pickup_borough == input$pickup_borough)])))))
   
-  output$DBorough <- renderUI(selectInput('dropoff_borough',
-                                          'Select Dropoff Borough', c(unique(sort(cab2016$dropoff_borough)))
-  ))
-  output$DNeighborhood <- renderUI(
+  output$dropoff_borough <- renderUI(selectInput('dropoff_borough',
+                                          'Select Dropoff Borough:', c(unique(sort(cab2016$dropoff_borough)))))
+  output$dropoff_zone <- renderUI(
     if(is.null(input$dropoff_borough)) {return()}
-    else selectInput('dropoff_zone', 'Select Dropoff Neighborhood',
-                     c(unique(sort(cab2016$dropoff_zone[which(cab2016$dropoff_borough == input$dropoff_borough)])))
-    ))
+    else selectInput('dropoff_zone', 'Select Dropoff Neighborhood:',
+                     c(unique(sort(cab2016$dropoff_zone[which(cab2016$dropoff_borough == input$dropoff_borough)])))))
+  dropdown1 <- reactive(cab2016[which(cab2016$pickup_borough==input$borough),])
   
-  sub1 <- reactive(
-    cab2016[which(cab2016$pickup_borough==input$borough),]
-  )
-  sub2 <- reactive(
-    sub1()[which(sub1()$pickup_zone == input$neighborhood),]
-  )
-  sub3 <- reactive(
-    cab2016[which(cab2016$dropoff_borough==input$dborough),]
-  )
-  sub4 <- reactive(
-    sub3()[which(sub3()$dropoff_zone == input$dneighborhood),]
-  )
+  dropdown2 <- reactive(dropdown1()[which(dropdown1()$pickup_zone == input$neighborhood),])
   
+  dropdown3 <- reactive(cab2016[which(cab2016$dropoff_borough==input$dborough),])
   
-  renderTable({
-    if(is.null(input$borough) || is.null(input$neighborhood)) {return()}
-    else return (sub2())
-  })
+  dropdown4 <- reactive(dropdown3()[which(dropdown3()$dropoff_zone == input$dneighborhood),])
   
-  renderTable({
-    if(is.null(input$dborough) || is.null(input$dneighborhood)) {return()}
-    else return (sub4())
-  })
   output$instructions <- renderText("As you are choosing your pickup and dropoff location, you can refer to the
                                     following map for reference. You can click on a marker and the name of that
                                     neighborhood will appear.")
@@ -436,19 +474,19 @@ server <- function(input, output) {
       output$prediction1 <- renderText(paste("Your trip is expected to cost $",
                                              format(round(df.taxi$fare_prediction, 2), nsmall=2),"but could cost
                                              as much as $",format(round(df.taxi$upper_interval,2), nsmall=2), "."))
-      df.taxi$time_prediction <- ceiling(predict(mod2, df.taxi))
-      df.taxi$lower_interval2 <- predict(mod2, df.taxi, interval="predict")[2]
-      df.taxi$upper_interval2 <- predict(mod2, df.taxi, interval="predict")[3]
-      output$prediction3 <- renderText(paste("Your trip is expected to take about", 
+      df.taxi$time_prediction <- ceiling(predict(duration_model, df.taxi))
+      df.taxi$lower_interval2 <- predict(duration_model, df.taxi, interval="predict")[2]
+      df.taxi$upper_interval2 <- predict(duration_model, df.taxi, interval="predict")[3]
+      output$prediction2 <- renderText(paste("Your trip is expected to take about", 
                                              format(round(df.taxi$time_prediction, 0), nsmall=0), " minutes but could
                                              last as long as", format(round(df.taxi$upper_interval2,0), nsmall=0), "minutes."))
       mapdata <- cab2016 %>%
         filter(pickup_zone==input$pickup_zone, dropoff_zone==input$dropoff_zone)
-      
       output$explanation <- renderText("The following map is representative of pickups and dropoffs.
                                        The blue dots represent cabs picking up fares in the same neighborhood you
                                        designated for pickup. The red dots represent cabs dropping off in the same 
-                                       neighborhood that you designated for drop off.")
+                                       neighborhood that you designated for drop off. If there are no points, we
+                                       have no data in our sample for rides between your specified locations.")
       output$Map2 <- renderLeaflet({
         leaflet(neighborhood_shape) %>%
           addTiles(urlTemplate = "http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}&s=Ga", 
@@ -461,28 +499,23 @@ server <- function(input, output) {
           addMarkers(~mapdata$n_longitude.y, ~mapdata$n_latitude.y, popup=~mapdata$dropoff_zone) %>%
           setView(-73.98, 40.75, zoom = 12)
       })
-      #the following google maps output is adapted slightly from
-      #https://stackoverflow.com/questions/42026578/drawing-journey-path-using-leaflet-in-r
+      # The following google maps output is adapted slightly from
+      # https://stackoverflow.com/questions/42026578/drawing-journey-path-using-leaflet-in-r
       
-      #our attempt at restricting the maps to nyc only - we were getting weird routes before this restriction
+      # Our attempt at restricting the maps to nyc only - we were getting weird routes before this restriction
       df.taxi$region <- paste("new york city", df.taxi$pickup_zone, sep=" ")
       df.taxi$region1 <- paste("new york city", df.taxi$dropoff_zone, sep=" ")
-      
       route <- eventReactive(input$submit,{
         origin <- df.taxi$region
         destination <- df.taxi$region1
-        
         return(data.frame(origin, destination, stringsAsFactors = F))
-        
       })
       output$myMap <- renderGoogle_map({
         selected_route <- route()
         directions <- google_directions(key = api_key,
                                  origin = selected_route$origin,
                                  destination = selected_route$destination)
-        
         df_route <- data.frame(route = directions$routes$overview_polyline$points)
-        
         google_map(key = api_key) %>%
           add_polylines(data = df_route, polyline = "route")
       })
