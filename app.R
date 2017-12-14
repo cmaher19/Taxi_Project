@@ -1,5 +1,32 @@
 # If you just click the Run App button, this should work.
 
+# TECHNICAL REPORT ABSTRACT: Through our examination of NYC taxi data, we sought to accurately predict a fare amount and a 
+# trip duration for a user based on the given information of pickup location, drop-off location, date, and time of day. 
+# We were interested in modernizing the cab service to make it comparable to ridesharing companies like Uber and Lyft. 
+# To achieve this, we used a Shiny Application that takes in several parameters from a user, inputs them into a model, 
+# and outputs a predicted value for cost and duration. In addition to a singular predicted value and a prediction interval, 
+# the Shiny output includes dynamic mapping features displaying the locations of neighborhoods, the starting and ending 
+# points in selected neighborhoods, and the trip route with an interactive street view. Our motivations aligned more with 
+# the wrangling of the data and the final deliverable than the accuracy of the predictions. Overall, we successfully created 
+# an interactive Shiny Application that included several dynamic features.
+
+# TECHNICAL REPORT INTRODUCTION: As aspiring young professionals, many of us may find ourselves living in New York City 
+# during the summer for internships and other career-driven endeavors. NYC is one of the most expensive cities to live in, 
+# and residents must consider several expenses such as food, rent, and transportation. In recent years, ridesharing 
+# companies like Lyft and Uber have become very popular, competing with the long-standing and traditional cab service. 
+# The modern characteristics of these up-and-coming transportation services give them an edge; mobile applications are 
+# available that allow users to “order” a ride, and they are given their estimated trip duration (through display of ETA) 
+# and the cost of their trip. Cabs are not as technologically-driven, and this motivated the ideas behind our project. 
+
+# Using NYC-based data, our ultimate goal was to determine whether we could accurately predict trip duration and total 
+# fare based on user input, and whether we could provide a mapping feature for the user. To tackle the predictions, we 
+# first explored relationships between variables then proceeded to create linear models. In addition, we created confidence 
+# intervals for these predictions to include reasonable uncertainty. For the maps, we used a Google Maps API to make our 
+# app more advanced and interesting. With these methods, we were able to create three maps. The first uses markers that 
+# represent all of the neighborhoods in the boroughs that the user can choose for their origin and/or destination. The 
+# second map depends on the user’s input, displaying specific pickup and drop-off locations within the chosen neighborhoods. The final map also relies on the user’s input, displaying the trip route from the origin to the destination. This map also has an additional interactive component, allowing the user to use the popular street-view feature of Google Maps on and around their selected route.
+
+
 # Load necessary packages
 library(mdsr)
 library(shiny)
@@ -12,6 +39,35 @@ library(leaflet)
 library(ggmap)
 library(googleway)
 
+# TECHNICAL REPORT DATA: We used a dataset on yellow cabs in New York City that was collected and provided to the NYC 
+# Taxi and Limousine Commission (TLC) by technology providers authorized under the Taxicab and Livery Passenger Enhancement 
+# Programs (TPEP/LPEP). This particular dataset included 19 variables, however for our purposes we were mostly interested 
+# in eight of them: tpep_pickup_datetime (date and time when meter was engaged), tpep_dropoff_datetime (date and time when 
+# meter was disengaged), trip_distance (in miles), pickup_longitude, pickup_latitude, dropoff_longitude, dropoff_latitude, 
+# and total_amount (total amount in dollars charged to passengers– considers total fare, miscellaneous extras and surcharges, 
+# tax, tolls, and credit card tips). Throughout our process of wrangling the data, we also created several new variables to 
+# aid our analysis: trip_duration (using tpep_pickup_datetime and tpep_dropoff_datetime), weekday (using weekdays() function), 
+# and “subsetted” variables like pickup_month, pickup_day, and pickup_hour, which we created by separating and modifying 
+# existing variables. We also changed the structure of several variables because they were not initially compatible with 
+# our model building and Shiny App (reactive drop-down menus required variables of specific structures in order to output 
+# desired names). 
+
+# Since the data came in a seaparte file for each month, and each file was roughly 1.5 GB, we had to take a random sample
+# of each file in order to read them into R and work with them. We did this by downloading each file onto a school computer
+# and randomly sampling using Perl through the Mac's terminal. After some trial and error, we got about 8,000 observations
+# (roughly 0.7% of each file) per month, which seemed to be the largest we could get while not crashing R everytime 
+# we ran a model. 
+
+# The initial sample data we were using (January 2017 data) had information about pickup and drop-off neighborhoods, 
+# so we built the app with this information in mind. When we accessed and began using the data from 2016 (January–June), 
+# we realized that neighborhood information was omitted and we only had latitude and longitude. In order to use all of the 
+# work we had already completed, we had to find a way to translate these geographical coordinates into neighborhoods. 
+# We found a dataset that had latitude and longitude for the center of each neighborhood in NYC, so we decided to use the 
+# distance formula to calculate the distance (in miles) between the ride pickup and each neighborhood centroid, took the 
+# minimum, and assigned that value as the pickup neighborhood; the same protocol followed for dropoffs. We were then able 
+# to use our app in our original designed layout. 
+
+######### TECHNICAL REPORT: READING IN DATA, WRANGLING, UNIVARIATE ANALYSIS, MODEL BUILDING #################
 
 # Load the data
 jan2016 <- read.csv('jan1.csv')
@@ -290,6 +346,11 @@ cab2016 %>%
 # Visualize relationship between trip distance and total fare --> upward linear trend
 # We can see from the shading of the dots that there were some low mileage trips that took a
 # long time and costed a lot (especially in Manhattan which is understandable)
+
+# Need to do this to trip duration to be able to use on next plot and in future plots/models
+cab2016 <- cab2016 %>%
+  mutate(trip_duration = as.numeric(trip_duration))
+
 cab2016 %>%
   ggplot(aes(x=trip_distance, y=total_amount, col=trip_duration)) + geom_point(alpha=0.1) + 
   facet_grid(pickup_borough~.) + ggtitle('Relationship between Fare and Trip Distance') +
@@ -334,16 +395,12 @@ total_mod <- lm(total_amount ~ pickup_hour + trip_distance + pickup_zone + dropo
 summary(total_mod)
 plot(which=1, total_mod)
 plot(which=2, total_mod)
-plot(which=4, total_mod) # this is very weird, the ones that are really high have perfect predictions
+plot(which=4, total_mod)
 
 cab2016 <- cab2016 %>%
   mutate(fare_prediction = predict(total_mod, cab2016))
 
 # MODEL BUILDING PART THREE: Trip duration predictions
-
-# Get variable in form that we can work with
-cab2016 <- cab2016 %>%
-  mutate(trip_duration = as.numeric(trip_duration))
 
 # We see some slight differences here, especially with Queens
 cab2016 %>%
@@ -378,6 +435,33 @@ plot(which=1, duration_model)
 plot(which=2, duration_model)
 plot(which=4, duration_model)
 
+cab2016 <- cab2016 %>%
+  mutate(duration_prediction = predict(duration_model, cab2016))
+
+# TECHNICAL REPORT RESULTS SECTION: Since all of our models include pickup and dropoff zone, they are very complex.
+# Therefore, it is hard to interpret individual coefficients. For each model we built, the following interpretation holds.
+# As an example, I will describe the total amount model. If a pickup zone has a positive coefficient, that means that it is
+# expected to cost more when picked up in that zone than whatever the reference zone integrated into the intercept would
+# cost. This is assuming that all other variables are held constant. If a pickup zone has a negative coefficient, it is 
+# expected to cost less for a trip in comparison to the reference pickup zone. The same interpretation holds for dropoff zones.
+# Additonally, the interpretations for the trip duration and trip distance models would be very similar. These models were
+# not built to be interpreted coefficient by coefficient. They were built for predictive purposes rather than explanatory
+# purposes. 
+
+
+
+# TECHNICAL REPORT DIAGNOSTICS SECTION: If you go back and run the diagnostic plots for each of the three models we built,
+# they are all bad. Going back to the visualizations before we built the models, you can see that there are many high 
+# outliers in the data. We did not want to remove these, because those are often from outer boroughs and we already
+# had limited information on those boroughs. Additionally, these models were very far off for permutations of neighborhoods 
+# that we did not have in our data. Had we been able to access all of the data available, this problem probably would not
+# have occurred to the same extent. After running tests using our Shiny app, we found that predictions were pretty accurate
+# for neighborhoods in Manhattan that are had a lot of data. Essentially, the more data we had, the better the prediction
+# was. Our models did an awful job of predicting for neighborhoods that had limited data associated with them. Also,
+# we have to be cautious because we are using the prediction from the distance model as a variable in our other models, so
+# if our distance model is inaccurate, then the other predictions are affected as well. Our models are not good with 
+# this amount of data.
+
 # STUFF WE NEED FOR MAPPING
 # Prepare shapefile for use
 file <- ('our_neighborhoods.geojson')
@@ -389,6 +473,8 @@ api_key <- "AIzaSyBMILnxtB-IgmBIjsaxYyZK_Y0LwoOvYIE"
 
 # We need this in order to say the weekday in 2018 for the date that the user chose
 nextyear <- data.frame(2018)
+
+###################################### TECHNICAL REPORT END DATA SECTION ###############################################
 
 # Define UI for application
 ui <- shinyUI(fluidPage(theme=shinytheme("slate"), 
