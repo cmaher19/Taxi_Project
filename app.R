@@ -203,7 +203,7 @@ cab2016 %>%
 
 cab2016 %>%
   filter(total_amount > 60) %>%
-  summarise(n=n()) # only 122 rides that cost more than 75 dollars, we can do without them
+  summarise(n=n()) # only 178 rides that cost more than 60 dollars, we can do without them
 
 cab2016 <- cab2016 %>%
   filter(total_amount < 60 & total_amount > 0)
@@ -216,7 +216,7 @@ cab2016 %>%
 
 cab2016 %>%
   filter(trip_duration > 75) %>%
-  summarise(n=n()) # only 87 rides that were longer than 75 minutes, we can do without them
+  summarise(n=n()) # only 76 rides that were longer than 75 minutes, we can do without them
 
 cab2016 <- cab2016 %>%
   filter(trip_duration < 75)
@@ -239,6 +239,8 @@ cab2016 <- cab2016 %>%
 # MODEL BUILDING PART ONE: trip distance (this wasn't one of the two model we said we'd build but it is useful to 
 # use in conjunction with the other models)
 
+# Warning from here on out: there are not very many good ways to visualize all of the pickup zones but we 
+# have tried to make semi-readable boxplots to show differences between zones
 # Graphs broken down by borough to make it more readable; There are clear differences between zones 
 cab2016 %>%
   filter(pickup_borough == "Bronx") %>%
@@ -360,7 +362,6 @@ cab2016 %>%
   ggplot(aes(x=dropoff_zone, y=total_amount, col=dropoff_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Dropoff Zone') + 
   ylab('Total Amount') + ggtitle('Total Amount by Dropoff Zone in Brooklyn') + labs(color = 'Dropoff Zone')
-
 
 # Conditions look better than the last one but still not great
 total_mod <- lm(total_amount ~ pickup_hour + trip_distance + pickup_zone + dropoff_zone, data=cab2016)
