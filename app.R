@@ -628,7 +628,7 @@ shinyApp(ui = ui, server = server)
 #
 # If we had more time, we could have utilized the Google Maps API further to make our predictions more
 # accurate. The Google Maps API has interactive features that allows users to enter specific addresses,
-# which we realized very late in the project. If we had known this earlier, the user could have inputted
+# which we realized very late in the project. If we had known this earlier, the user could have input
 # addresses for pickup and dropoff, and our predicted value of trip distance would have been nearly 
 # perfect. Since trip distance was an important variable for the other predictions, this would have
 # improved the other models and made our predictions much more accurate, and more resemblant of the 
