@@ -80,7 +80,6 @@ cab2016 <- rbind(jan2016, feb2016, mar2016, apr2016, may2016, jun2016)
 centroids <- read.csv('NHoodNameCentroids.csv')
 
 # DATA WRANGLING
-
 # Data Wrangling Part 1: Get information about neighborhood pickup and dropoff onto cab data
 
 # Clean centroid data
@@ -89,17 +88,13 @@ centroids <- centroids %>%
   separate(longitude.latitude.section.borough, into=c('n_longitude', 'n_latitude', 'neighborhood', 'borough'), sep=';') %>%
   mutate(n_longitude = as.numeric(n_longitude), n_latitude = as.numeric(n_latitude))
 
-# There are four neighborhoods names that exist in two places
-# This is causing issues especially for the 'Chelsea' neighborhoods
-# because the one in Manhattan is oftentimes getting encoded as being in 
-# Staten Island
+# There are four neighborhoods names that exist in two places; This is causing double counting issues
 repeat_neighborhoods <- centroids %>%
   group_by(neighborhood) %>%
   summarise(n=n()) %>%
   filter(n>1)
 
-# For Chelsea and Murray Hill, I kept the Manhattan locations
-# For Sunnyside and Bay Terrace, I kept the Queens locations
+# For Chelsea and Murray Hill, keep Manhattan location; For Sunnyside and Bay Terrace, keep Queens location
 centroids <- centroids[-247,]
 centroids <- centroids[-238,]
 centroids <- centroids[-183,]
@@ -143,10 +138,7 @@ dropoff_nhood <- data.frame(dropoff_nhood)
 neighborhoods <- cbind(pickup_nhood, dropoff_nhood)
 cab2016 <- cbind(cab2016, neighborhoods)
 
-# Join neighborhood centroid data onto yellow cab data for both pickup and dropoff location
-# We need neighborhood lat and long in later mapping
-# The warning message here is fine - it did some of the work for us by making the neighborhood
-# variables in the cab dataset into characters
+#Join cab data onto centroid data; Warning message produced here is fine and actually does some of our work for us
 cab2016 <- left_join(cab2016, centroids, by=c('pickup_nhood'='neighborhood')) %>%
   rename(pickup_borough = borough, pickup_zone=pickup_nhood)
 
@@ -164,8 +156,7 @@ cab2016 <- cab2016 %>%
 cab2016 <- cab2016 %>%
   mutate(trip_duration = difftime(tpep_dropoff_datetime, tpep_pickup_datetime, unit='min'))
 
-# Split the data and time aspects into two separate variables
-# Trim extra space from the front of the time variables
+# Split the data and time aspects into separate variables; Trim extra space from the front of the time variable; 
 # Convert pickup date into actual date variable
 cab2016 <- cab2016 %>%
   separate(tpep_pickup_datetime, into=c('pickup_date', 'pickup_time'), sep=10) %>%
@@ -173,9 +164,8 @@ cab2016 <- cab2016 %>%
   mutate(pickup_time = trimws(pickup_time, which='left'),
          dropoff_time = trimws(dropoff_time, which='left'))
 
-# Separate the time variables into hours and minutes and seconds, then factor them
-# After going through all of our analyses, we never used minutes or seconds so I'm going
-# to remove them here
+# Separate the time variables into hours and minutes and seconds, then factor them; 
+# Never used seconds or minutes so remove
 cab2016 <- cab2016 %>%
   separate(pickup_time, into = c('pickup_hour', 'pickup_minute', 'pickup_seconds'), sep=':') %>%
   separate(dropoff_time, into = c('dropoff_hour', 'dropoff_minute', 'dropoff_seconds'), sep=':') %>%
@@ -187,8 +177,7 @@ cab2016 <- cab2016 %>%
   mutate(pickup_date = as.Date(pickup_date), dropoff_date = as.Date(dropoff_date)) %>%
   mutate(weekday = weekdays(pickup_date))
 
-# Separate date variables into year, month, and day separately so that they are easier to 
-# match with user input
+# Separate date variables into year, month, and day separately to match with user input;
 # Convert to factors for model building
 cab2016 <- cab2016 %>%
   separate(pickup_date, into=c('pickup_year', 'pickup_month', 'pickup_day'), sep='-') %>%
@@ -196,10 +185,9 @@ cab2016 <- cab2016 %>%
   mutate(pickup_month = as.factor(pickup_month), pickup_day = as.factor(pickup_day),
          dropoff_month = as.factor(dropoff_month), dropoff_day = as.factor(dropoff_day))
 
-# Filter out observations with pickup/dropoff coordinates with zeroes and rates other 
-# than the standard fare rates (there were some shady exchanges in the nonstandard fare options)
-# Also removing variables that we didn't use
-# All of the payment variables were summed in the total amount, so we removed individual charges
+#Filter out observations with pickup/dropoff coordinates with zeroes and rates other than the standard fare rates 
+# (there were some shady exchanges in the nonstandard fare options); Remove variables we didn't use (the payment 
+# variables were summed in the total amount, so we removed the individual charges)
 cab2016 <- cab2016 %>%
   filter(RatecodeID == 1, pickup_longitude != 0, dropoff_longitude != 0) %>%
   select(-VendorID, -store_and_fwd_flag, -payment_type, -fare_amount, -extra, -mta_tax, -tip_amount, 
@@ -234,19 +222,15 @@ cab2016 <- cab2016 %>%
   filter(trip_duration < 75)
 
 # Look at and filter trip distance
-
-# Some of these are literally not possible with my knowledge of New York
-# For example, the distance between Midtown and Chelsea could not possibly be zero
-# We are going to filter out trips with distances of zero that somehow went
-# from one neighborhood to another
+# Some of these are literally not possible (the distance between Midtown and Chelsea could not possibly be zero)
 cab2016 %>%
   filter(trip_distance==0 & pickup_zone != dropoff_zone)
 
 cab2016 %>%
-  filter(trip_distance > 20) #I'm only going to remove the two of these that are definitely wrong, I'll filter out trips >27mi
+  filter(trip_distance > 20) 
 
 cab2016 <- cab2016 %>%
-  filter(trip_distance != 0 & trip_distance < 27)
+  filter(trip_distance != 0 & trip_distance < 20)
 
 
 # MODEL BUILDING 
@@ -255,8 +239,7 @@ cab2016 <- cab2016 %>%
 # MODEL BUILDING PART ONE: trip distance (this wasn't one of the two model we said we'd build but it is useful to 
 # use in conjunction with the other models)
 
-# Graphs broken down by borough to make it more readable
-# There are clear differences between zones --> use in model
+# Graphs broken down by borough to make it more readable; There are clear differences between zones 
 cab2016 %>%
   filter(pickup_borough == "Bronx") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
@@ -287,8 +270,7 @@ cab2016 %>%
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
   ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Staten Island') + labs(color = 'Pickup Zone')
 
-# Same graphs but for dropoff zone instead of pickup zone
-# You have to zoom these graphs to see them in full
+# Same graphs but for dropoff zone instead of pickup zone; You have to zoom these graphs to see them in full
 cab2016 %>%
   filter(dropoff_borough == "Bronx") %>%
   ggplot(aes(x=dropoff_zone, y=trip_distance, col=dropoff_zone)) + geom_boxplot() +
@@ -321,9 +303,6 @@ cab2016 %>%
   labs(color = 'Dropoff Zone')
 
 # Create model
-# We tried models with other things but they never helped the performance of the model
-# The models R squared value is okay but the diagnostic plots look horrible
-# There is definitely a better way to do this but we didn't find it
 distance_mod <- lm(trip_distance ~ pickup_zone + dropoff_zone + pickup_borough
                    + dropoff_borough, data=cab2016)
 summary(distance_mod)
@@ -343,11 +322,8 @@ cab2016 %>%
   ggplot(aes(x=pickup_hour, y=total_amount, col=pickup_hour)) + geom_boxplot() + xlab('Pickup Hour') +
   ylab('Total Fare Amount ($)') + ggtitle('Total Fare Amount by Hour') + labs(color='Pickup Hour')
 
-# Visualize relationship between trip distance and total fare --> upward linear trend
-# We can see from the shading of the dots that there were some low mileage trips that took a
-# long time and costed a lot (especially in Manhattan which is understandable)
-
-# Need to do this to trip duration to be able to use on next plot and in future plots/models
+# Visualize relationship between trip distance and total fare; Shading of the dots shows that there 
+# were some low mileage trips that took a long time and costed a lot (especially in Manhattan)
 cab2016 <- cab2016 %>%
   mutate(trip_duration = as.numeric(trip_duration))
 
@@ -357,10 +333,9 @@ cab2016 %>%
   xlab('Trip Distance') + ylab('Total Amount ($)') + labs(color = 'Trip Duration') + 
   scale_color_gradient(low='yellow', high='purple')
 
-# Same plots as above but for total amount by pickup zone - each graph represent a borough
-# We are not putting all of them here but there are obvious differences between pickup zones
-# so that should be included in the model
-# Use zoom function to see plots better
+# Same plots as above but for total amount by pickup zone - each graph represent a borough; 
+# Not graphing all of them but there are obvious differences between pickup zones (use zoom 
+# function to see plots better)
 cab2016 %>%
   filter(pickup_borough == "Bronx") %>%
   ggplot(aes(x=pickup_zone, y=total_amount, col=pickup_zone)) + geom_boxplot() +
@@ -373,10 +348,7 @@ cab2016 %>%
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
   ylab('Total Amount') + ggtitle('Total Amount by Pickup Zone in Brooklyn') + labs(color = 'Pickup Zone')
 
-# Same plots as above but for total amount by dropoff zone - each graph represent a borough
-# We are not putting all of them here but there are obvious differences between dropoff zones
-# so that should be included in the model
-# Use zoom function to see plots better
+# Same as above but for total amount by dropoff zone; Again, differences exist between dropoff zones
 cab2016 %>%
   filter(dropoff_borough == "Bronx") %>%
   ggplot(aes(x=dropoff_zone, y=total_amount, col=dropoff_zone)) + geom_boxplot() +
@@ -414,21 +386,19 @@ cab2016 %>%
   ylab('Trip Duration (mins)') + ggtitle('Trip Duration by Dropoff Borough') + labs(color='Dropoff Borough') + 
   theme(axis.text.x=element_text(angle=90, hjust=1))
 
-# Trip duration against trip distance colored by the pickup borough
-# There is definitely a relationship here but it doesn't seem quite linear
+# Trip duration against trip distance colored by the pickup borough; Definitely a relationship but it doesn't 
+# seem quite linear
 cab2016 %>%
   ggplot(aes(x=trip_distance, y=trip_duration, col=pickup_borough)) + geom_point(alpha=0.4)
 
-# Not showing many plots for pickup zone and dropoff zone here but they look similar to the ones
-# in the previous models (one example is below)
+# Not showing all plots for pickup and dropoff zone but they look similar to those from previous models
 cab2016 %>%
   filter(pickup_borough == "Brooklyn") %>%
   ggplot(aes(x=pickup_zone, y=trip_distance, col=pickup_zone)) + geom_boxplot() +
   theme(axis.text.x=element_text(angle=90, hjust=1)) + xlab('Pickup Zone') + 
   ylab('Trip Distance (mi)') + ggtitle('Trip Distance by Pickup Zone in Brooklyn') + labs(color = 'Pickup Zone')
 
-# Final model for predicting trip duration (in minutes)
-# The conditions still don't look good 
+# Final model for predicting trip duration (in minutes); Conditions look awful 
 duration_model <- lm(trip_duration ~ pickup_zone + dropoff_zone + pickup_hour + trip_distance, data=cab2016)
 summary(duration_model)
 plot(which=1, duration_model)
@@ -469,7 +439,7 @@ cab2016 <- cab2016 %>%
 # Our models are not good with this amount of data and we should be careful to read too far into measures such as adjusted
 # R^2 when looking at our models.
 
-# STUFF WE NEED FOR MAPPING
+# MAPPING
 # Prepare shapefile for use
 file <- ('our_neighborhoods.geojson')
 neighborhood_shape <- readOGR(dsn = file, layer = "our_neighborhoods")
@@ -645,7 +615,7 @@ shinyApp(ui = ui, server = server)
 # were created for these specific neighborhoods. We ultimately chose to keep the borough locations for the
 # neighborhood with more observations, which meant keeping the Manhattan locations for Chelsea and Murray
 # Hill, and the Queens locations for Sunnyside and Bay Terrace. These decisions were necessary, but limited
-# the scope of our project because we  ultimately had to remove four neighborhoods from the dataset.
+# the scope of our project because we ultimately had to remove four neighborhoods from the dataset.
 #
 # Additionally, our method to translate latitude and longitude into neighborhoods was our best option,
 # but it was not the most effective or accurate because the highest density of pickups in a neighborhood
@@ -662,6 +632,10 @@ shinyApp(ui = ui, server = server)
 # addresses for pickup and dropoff, and our predicted value of trip distance would have been nearly 
 # perfect. Since trip distance was an important variable for the other predictions, this would have
 # improved the other models and made our predictions much more accurate, and more resemblant of the 
-# applications for Lyft and Uber.
+# applications for Lyft and Uber. All of this being said, we are happy with all that we were able 
+# do in terms of data wrangling and learning Shiny throughout the course of this project. We are
+# happy with the models we built for when they were predicting popular trips (such as Midtown
+# to Chelsea in Manhattan) and extremely cautious about taking the predictions with more than a grain of 
+# salt for neighborhoods with limited data.
 
 
