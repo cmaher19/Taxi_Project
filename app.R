@@ -483,6 +483,7 @@ nextyear <- data.frame(2018)
 
 ###################################### TECHNICAL REPORT END DATA SECTION ###############################################
 
+
 # Define UI for application
 ui <- shinyUI(fluidPage(theme=shinytheme("slate"), 
   span(titlePanel('CA$H CAB'), style="color:#F9D90A"),
@@ -617,4 +618,50 @@ server <- function(input, output) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
+
+# TECHNICAL REPORT CONCLUSION SECTION: Ultimately, we were able to create a usable end product in the 
+# form of a Shiny Application. The user is able to input the time, date, and place where they would like
+# to be picked up as well as their destination. The app returns a predicted fare for their trip as well
+# as an estimated trip duration. We also included a form of uncertainty (“your trip could last as long 
+# as …” or “your trip could cost as much as …”) so the user is not surprised if their actual fare or trip
+# duration are more than the singular predicted values. Additionally, we were able to successfully
+# visualize the distribution of neighborhoods with a map, and we were also able to return visualizations
+# of the selected trip route for the user.  
+#
+# We experienced several limitations throughout the course of this project, mostly stemming from the size
+# and depth of our dataset. The biggest restriction that limited the scope of our findings was the amount
+# of data we were actually able to use in R. As mentioned before, we were only able to use roughly 0.7% of
+# the total data, due to the sheer size of the files and capabilities of R. This relatively small amount
+# of data affected the accuracy of our predictions; the more combinations of pickup and dropoff 
+# neighborhoods we were able to use, the more accurate our predictions would become. Since we were not
+# able to use a lot of data, we would expect that using more and ideally all of the data would result in
+# much more accurate predictions. If we were able to use all of the data, we would expect our models to
+# no longer have rank deficit fits. 
+#
+# We also had to make some subjective decisions when joining our original dataset with the centroid data
+# for the neighborhood locations. There were four instances where two boroughs had neighborhoods with the
+# same name which was problematic when joining the datasets because excessive rows and repeated information
+# were created for these specific neighborhoods. We ultimately chose to keep the borough locations for the
+# neighborhood with more observations, which meant keeping the Manhattan locations for Chelsea and Murray
+# Hill, and the Queens locations for Sunnyside and Bay Terrace. These decisions were necessary, but limited
+# the scope of our project because we  ultimately had to remove four neighborhoods from the dataset.
+#
+# Additionally, our method to translate latitude and longitude into neighborhoods was our best option,
+# but it was not the most effective or accurate because the highest density of pickups in a neighborhood
+# is not necessarily at the designated center. As a result, the distance prediction was off, which in turn
+# affected the predictions for trip duration and total fare because distance was included in both models.
+# This discrepancy can be visualized by running the app and setting the pickup location to Washington 
+# Heights in Manhattan and the dropoff location to Morningside Heights in Manhattan. You can see that the
+# placement of the markers for these two neighborhoods are not close to the concentration of the most
+# frequent pickup and dropoff locations within those areas. 
+#
+# If we had more time, we could have utilized the Google Maps API further to make our predictions more
+# accurate. The Google Maps API has interactive features that allows users to enter specific addresses,
+# which we realized very late in the project. If we had known this earlier, the user could have inputted
+# addresses for pickup and dropoff, and our predicted value of trip distance would have been nearly 
+# perfect. Since trip distance was an important variable for the other predictions, this would have
+# improved the other models and made our predictions much more accurate, and more resemblant of the 
+# applications for Lyft and Uber.
+
 
