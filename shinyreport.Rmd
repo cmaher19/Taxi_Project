@@ -184,7 +184,7 @@ cab2016 %>%
 
 cab2016 %>%
   filter(total_amount > 60) %>%
-  summarise(n=n()) # only 122 rides that cost more than 75 dollars, we can do without them
+  summarise(n=n()) # only 178 rides that cost more than 60 dollars, we can do without them
 
 cab2016 <- cab2016 %>%
   filter(total_amount < 60 & total_amount > 0)
@@ -199,7 +199,7 @@ cab2016 %>%
 
 cab2016 %>%
   filter(trip_duration > 75) %>%
-  summarise(n=n()) # only 87 rides that were longer than 75 minutes, we can do without them
+  summarise(n=n()) # only 76 rides that were longer than 75 minutes, we can do without them
 
 cab2016 <- cab2016 %>%
   filter(trip_duration < 75)
