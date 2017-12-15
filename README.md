@@ -1,2 +1,4 @@
 # datascience
-As long as you have all of the necessary packages installed, you should just be able to click 'Run App' to run the entire document. Also, your working directory should be set as wherever this project would exist on your computer, which we're assuming will happen automatically when you pull.
+Your working directory should be set as wherever this project would exist on your computer, which we're assuming will happen automatically when you pull (our working directories are set where the 'datascience.Rproj' is). 
+
+Simply clicking 'Run App' should give you reproducible results for our project.
