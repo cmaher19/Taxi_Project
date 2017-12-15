@@ -8,7 +8,7 @@
 # the Shiny output includes dynamic mapping features displaying the locations of neighborhoods, the starting and ending 
 # points in selected neighborhoods, and the trip route with an interactive street view. Our motivations aligned more with 
 # the wrangling of the data and the final deliverable than the accuracy of the predictions. Overall, we successfully created 
-# an interactive Shiny Application that included several dynamic features.
+# an interactive Shiny Application that included several dynamic features. 
 
 # TECHNICAL REPORT INTRODUCTION: As aspiring young professionals, many of us may find ourselves living in New York City 
 # during the summer for internships and other career-driven endeavors. NYC is one of the most expensive cities to live in, 
@@ -446,21 +446,28 @@ cab2016 <- cab2016 %>%
 # expected to cost less for a trip in comparison to the reference pickup zone. The same interpretation holds for dropoff zones.
 # Additonally, the interpretations for the trip duration and trip distance models would be very similar. These models were
 # not built to be interpreted coefficient by coefficient. They were built for predictive purposes rather than explanatory
-# purposes. 
+# purposes. To our surprise, adding which day of the week it was didn't seem to add anything to the model. We thought that
+# weekdays versus weekends may have had an effect of total cost and trip duration but we didn't see any such effects in 
+# the model. Though we've explained a bit about our model building efforts here, I think that the main "results" of our
+# project were involved in successfully creating the Shiny app and learning new coding skills through the process.
+# Therefore, we will touch on that in the conclusion, which can act as part of this results section as well.
 
 
 
 # TECHNICAL REPORT DIAGNOSTICS SECTION: If you go back and run the diagnostic plots for each of the three models we built,
-# they are all bad. Going back to the visualizations before we built the models, you can see that there are many high 
-# outliers in the data. We did not want to remove these, because those are often from outer boroughs and we already
-# had limited information on those boroughs. Additionally, these models were very far off for permutations of neighborhoods 
-# that we did not have in our data. Had we been able to access all of the data available, this problem probably would not
-# have occurred to the same extent. After running tests using our Shiny app, we found that predictions were pretty accurate
-# for neighborhoods in Manhattan that are had a lot of data. Essentially, the more data we had, the better the prediction
-# was. Our models did an awful job of predicting for neighborhoods that had limited data associated with them. Also,
-# we have to be cautious because we are using the prediction from the distance model as a variable in our other models, so
-# if our distance model is inaccurate, then the other predictions are affected as well. Our models are not good with 
-# this amount of data.
+# they are all quite awful. The conditions for linear models certainly are not met. Our residuals plots don't seem to be
+# normally distributed, our QQ plots have major normality issues in the tails, and we had points for each model that had 
+# concerning Cook's distance values (we measure 'concerning' as greater than 0.05). Going back to the visualizations before 
+# we built the models, you can see that there are many high outliers in the data. We did not want to remove these, because 
+# those are often from outer boroughs and we already had limited information on those boroughs. Additionally, these models 
+# were very far off for permutations of neighborhoods that we did not have in our data. Had we been able to access all of 
+# the data available, this problem probably would not have occurred to the same extent. After running tests using our Shiny 
+# app, we found that predictions were pretty accurate for neighborhoods in Manhattan that are had a lot of data. Essentially, 
+# the more data we had, the better the prediction was. Our models did an awful job of predicting for neighborhoods that had 
+# limited data associated with them. Also, we have to be cautious because we are using the prediction from the distance model
+# as a variable in our other models, so if our distance model is inaccurate, then the other predictions are affected as well.
+# Our models are not good with this amount of data and we should be careful to read too far into measures such as adjusted
+# R^2 when looking at our models.
 
 # STUFF WE NEED FOR MAPPING
 # Prepare shapefile for use
@@ -605,9 +612,7 @@ server <- function(input, output) {
         google_map(key = api_key) %>%
           add_polylines(data = df_route, polyline = "route")
       })
-      
     })
-  
   }
 
 # Run the application 
