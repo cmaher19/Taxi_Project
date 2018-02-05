@@ -443,7 +443,7 @@ cab2016 <- cab2016 %>%
 # MAPPING
 # Prepare shapefile for use
 file <- ('our_neighborhoods.geojson')
-neighborhood_shape <- readOGR(dsn = file, layer = "our_neighborhoods")
+neighborhood_shape <- readOGR(dsn = file, layer = "OGRGeoJSON")
 neighborhood_shape_df <- tidy(neighborhood_shape)
 
 # API Key for Google Maps
